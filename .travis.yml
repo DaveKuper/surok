@@ -12,9 +12,9 @@ services:
 before_install:
   - cd build && ./build.sh surok_image
   - ./build.sh alpine
-#  - ./build.sh centos
-#  - ./build.sh centos_rpm
-#  - ./build.sh fedora_rpm
+  - ./build.sh centos
+  - ./build.sh centos_rpm
+  - ./build.sh fedora_rpm
 
 # tests script
 script:

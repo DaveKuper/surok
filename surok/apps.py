@@ -12,6 +12,7 @@ import urllib3
 import imp
 import json
 import requests
+import time
 
 '''
 Public Apps object
@@ -30,8 +31,6 @@ class Apps:
             self._store = Store()
         if not hasattr(self, '_discovery'):
             self._discovery = Discovery()
-        if not hasattr(self, '_loadmodule'):
-            self._loadmodule = LoadModules()
 
     def update(self):
         """ format app config:
@@ -50,7 +49,8 @@ class Apps:
         for app in [self._config.apps[x] for x in self._config.apps]:
             my = {"services": self._discovery.resolve(app),
                   "conf_name": app['conf_name'],
-                  "env": os.environ}
+                  "env": os.environ,
+                  "timestamp": time.time()}
             _restart = False
             for conf in [{'env': x, 'value': self._render(my, app['environments'][x])} for x in app['environments']]:
                 if self._store.check_update(conf):
