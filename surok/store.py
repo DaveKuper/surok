@@ -1,9 +1,9 @@
 # Public names
 __all__ = ['Store']
 
-from .logger import *
-from .config import *
-from .discovery import *
+from .logger import Logger
+from .config import Config, AppConfig
+from .discovery import Discovery
 import os
 import hashlib
 import json
@@ -47,16 +47,19 @@ class Store(dict):
     def set(self, temp):
         new_temp = self._normalize(temp)
         if new_temp.get('dest'):
-            self._stores[new_temp['store']].set(new_temp.get('hashid'),
-                                       {'hash': new_temp.get('hash'),
-                                        'dest': new_temp.get('dest')})
+            self._stores[new_temp['store']].set(
+                new_temp.get('hashid'), {
+                    'hash': new_temp.get('hash'),
+                    'dest': new_temp.get('dest')})
         elif new_temp.get('env'):
-            self._stores[new_temp['store']].set(new_temp.get('hashid'),
-                                       {'hash': new_temp.get('hash'),
-                                         'env': new_temp.get('env')})
+            self._stores[new_temp['store']].set(
+                new_temp.get('hashid'), {
+                    'hash': new_temp.get('hash'),
+                    'env': new_temp.get('env')})
         else:
-            self._stores[new_temp['store']].set(new_temp.get('hashid'),
-                                       {'hash': new_temp.get('hash')})
+            self._stores[new_temp['store']].set(
+                new_temp.get('hashid'), {
+                    'hash': new_temp.get('hash')})
 
     def delete(self, temp):
         new_temp = self._normalize(temp)
@@ -93,7 +96,8 @@ class Store(dict):
                         os.remove(temp.get('dest'))
                 except OSError as err:
                     self._logger.warning(
-                        "Delete file {0} failed:\n{1}".format(temp.get('dest'), err))
+                        "Delete file {0} failed:\n{1}".format(
+                            temp.get('dest'), err))
                     pass
             elif temp.get('env'):
                 try:
@@ -101,32 +105,37 @@ class Store(dict):
                         del os.environ[temp.get('env')]
                 except:
                     self._logger.warning(
-                        'Delete environment "{0}" failed.'.format(temp.get('env')))
+                        'Delete environment "{0}" failed.'.format(
+                            temp.get('env')))
                     pass
             self.delete(temp)
         self._update_store = {}
 
     def _normalize(self, unnormconf):
+        def hashsha1(data):
+            return hashlib.sha1(data.encode()).hexdigest()
+
         if type(unnormconf).__name__ == 'dict':
             conf = unnormconf.copy()
         else:
             conf = {'hashid': unnormconf}
         conf.setdefault('store', self._config['default_store'])
         if 'dest' in conf:
-            conf['hashid'] = hashlib.sha1(conf['dest'].encode()).hexdigest()
+            conf['hashid'] = hashsha1(conf['dest'])
         elif 'env' in conf:
-            conf['hashid'] = hashlib.sha1(str('env:' + conf['env']).encode()).hexdigest()
+            conf['hashid'] = hashsha1('env:' + conf['env'])
         elif 'localid' in conf:
-            conf['hashid'] = hashlib.sha1(str('data:' + conf['localid']).encode()).hexdigest()
+            conf['hashid'] = hashsha1('data:' + conf['localid'])
 
         if 'data' in conf:
-            conf['hash'] = hashlib.sha1(json.dumps(conf['data'], sort_keys=True).encode()).hexdigest()
+            conf['hash'] = hashsha1(json.dumps(conf['data'], sort_keys=True))
         elif type(conf.get('value')).__name__ == 'str':
-            conf['hash'] = hashlib.sha1(conf['value'].encode()).hexdigest()
+            conf['hash'] = hashsha1(conf['value'])
 
         if not self._stores[conf['store']].enabled():
             self._logger.warning(
-                'Store "{0}" not enabled. Store type change to "memory" for hashid "{1}".'.format(conf['store'], conf['hashid']))
+                'Store "{0}" not enabled. Store type change to "memory" for hashid "{1}".'.format(
+                    conf['store'], conf['hashid']))
             conf['store'] = 'memory'
         return conf
 
@@ -225,7 +234,9 @@ class StoreFiles(_StoreTemplate):
             pass
 
     def keys(self):
-        return [f.split('.')[0] for f in os.listdir(self._config['files']['path']) if os.path.isfile(os.path.join(self._config['files']['path'], f)) and f.split('.')[1] == 'surok']
+        return [f.split('.')[0] for f in os.listdir(
+            self._config['files']['path']) if os.path.isfile(os.path.join(
+                self._config['files']['path'], f)) and f.split('.')[1] == 'surok']
 
     def delete(self, key):
         try:
@@ -246,6 +257,7 @@ class StoreMemcached(_StoreTemplate):
     _enabled = False
     _hosts = []
     _mod_memcache = None
+
     def __init__(self, *args):
         super().__init__(*args)
         self._enabled = self._config['memcached']['enabled']
@@ -292,7 +304,10 @@ class StoreMemcached(_StoreTemplate):
                         hosts = [self._config['memcached']['host']]
                     else:
                         hosts = []
-                if self._store.check_update({'localid': 'memcached_discovery', 'data': hosts, 'store': 'memory'}):
+                if self._store.check_update({
+                        'localid': 'memcached_discovery',
+                        'data': hosts,
+                        'store': 'memory'}):
                     self._hosts = hosts
                     self._enabled = True
                     self._reconnect()

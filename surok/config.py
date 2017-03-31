@@ -4,7 +4,7 @@ __all__ = ['Config', 'AppConfig']
 import hashlib
 import json
 import os
-from .logger import *
+from .logger import Logger
 
 
 class _ConfigTemplate(dict):
@@ -344,7 +344,8 @@ class Config(_ConfigTemplate):
 
     def update_apps(self):
         self.apps = {}
-        for app_conf in sorted([os.path.join(self.get('confd'), f) for f in os.listdir(self.get('confd')) if os.path.isfile(os.path.join(self.get('confd'), f))]):
+        for app_conf in sorted([os.path.join(self.get('confd'), f) for f in os.listdir(
+                self.get('confd')) if os.path.isfile(os.path.join(self.get('confd'), f))]):
             app = AppConfig(app_conf)
             self.apps[app['conf_name']] = app
 

@@ -1,25 +1,31 @@
 # Public names
 __all__ = ['Apps']
 
-from .logger import *
-from .config import *
-from .discovery import *
-from .store import *
 import jinja2
 import os
-import hashlib
-import urllib3
 import imp
-import json
 import requests
-
-'''
-Public Apps object
-==================================================
-'''
+import time
+from .logger import Logger
+from .config import Config
+from .discovery import Discovery
+from .store import Store
 
 
 class Apps:
+    """ Public Apps object
+    ==================================================
+        format app config:
+        'files': {
+            '/destination/file1': 'Config data 1',
+            '/destination/file2': 'Config data 2',
+            '/destination/fileN': 'Config data N'
+        },
+        'environments': {
+            'ENV1': 'Jinja2 template for value "{{ my.env.get('ENV1') }}"',
+            'ENV2': 'Next Jinja2 template for value "{{ my.env.get('ENV2') }}"'
+        }
+    """
 
     def __init__(self):
         if not hasattr(self, '_config'):
@@ -30,33 +36,27 @@ class Apps:
             self._store = Store()
         if not hasattr(self, '_discovery'):
             self._discovery = Discovery()
-        if not hasattr(self, '_loadmodule'):
-            self._loadmodule = LoadModules()
 
     def update(self):
-        """ format app config:
-            'files': {
-                '/destination/file1': 'Config data 1',
-                '/destination/file2': 'Config data 2',
-                '/destination/fileN': 'Config data N'
-            },
-            'environments': {
-                'ENV1': 'Jinja2 template for value "{{ my.env.get('ENV1') }}"',
-                'ENV2': 'Next Jinja2 template for value "{{ my.env.get('ENV2') }}"'
-            }
-        """
         self._discovery.update_data()
         self._store.check()
         for app in [self._config.apps[x] for x in self._config.apps]:
             my = {"services": self._discovery.resolve(app),
                   "conf_name": app['conf_name'],
-                  "env": os.environ}
+                  "env": os.environ,
+                  "timestamp": time.time()}
             _restart = False
-            for conf in [{'env': x, 'value': self._render(my, app['environments'][x])} for x in app['environments']]:
+            for conf in [{
+                            'env': x,
+                            'value': self._render(my, app['environments'][x])
+                        } for x in app['environments']]:
                 if self._store.check_update(conf):
                     _restart = True
                     os.environ[conf['env']] = conf['value']
-            for conf in [{'dest': x, 'value': self._render(my, app['files'][x])} for x in app['files']]:
+            for conf in [{
+                            'dest': x,
+                            'value': self._render(my, app['files'][x])
+                        } for x in app['files']]:
                 if self._store.check_update(conf):
                     _restart = True
                     self._logger.info("Write new configuration of ", conf.get('dest'))
@@ -66,17 +66,20 @@ class Apps:
                         f.close()
                     except OSError as err:
                         self._logger.error(
-                            'Config file {0} open or write error. OS error : {1}'.format(conf.get('dest'), err))
+                            'Config file {0} open or write error. OS error : {1}'.format(
+                                conf.get('dest'), err))
                         pass
                     except err:
                         self._logger.error(
-                            'Config file {0} open or write error. Error : {1}'.format(conf.get('dest'), err))
+                            'Config file {0} open or write error. Error : {1}'.format(
+                                conf.get('dest'), err))
                         pass
             if _restart:
                 if self._config['marathon']['restart']:
                     self._restart_self_in_marathon()
                 else:
-                    self._logger.info('Restart ', app.get('reload_cmd'), ' app.\n', os.popen(app['reload_cmd']).read())
+                    self._logger.info('Restart {0} app:\n{1}'.format(
+                        app.get('reload_cmd'), os.popen(app['reload_cmd']).read()))
         self._store.clear()
 
     def _render(self, my, temp):
@@ -97,11 +100,10 @@ class Apps:
             r = requests.post('http://' + self._config['marathon']['host'] + '/v2/apps/' + env + '/restart',
                               data={'force': self._config['marathon']['force']})
             if r.status_code != 200:
-                self._logger.error(
-                    'Restart container {0} failed. {1}'.format(env, raise_for_status()))
+                self._logger.error('Restart container {0} failed. {1}'.format(
+                    env, r.raise_for_status()))
         else:
-            logger.error(
-                'Restart self container failed. Cannot find MARATHON_APP_ID.')
+            self._logger.error('Restart self container failed. Cannot find MARATHON_APP_ID.')
 
 
 class LoadModules:
@@ -125,12 +127,15 @@ class LoadModules:
                 self._config = Config()
             if not hasattr(self, '_logger'):
                 self._logger = Logger()
-            for module in [os.path.join(self._config['modules'], f) for f in os.listdir(self._config['modules']) if os.path.isfile(os.path.join(self._config['modules'], f))]:
+            for module in [os.path.join(self._config['modules'], f) for f in os.listdir(
+                    self._config['modules']) if os.path.isfile(
+                        os.path.join(self._config['modules'], f))]:
                 try:
                     m = imp.load_source('__surok.module__', module)
                 except:
                     self._logger.error('Load module {} failed.'.format(module))
                 finally:
-                    for key in [x for x in dir(m) if type(getattr(m, x)).__name__ == 'function' and not x.startswith('_')]:
+                    for key in [x for x in dir(m) if type(
+                            getattr(m, x)).__name__ == 'function' and not x.startswith('_')]:
                         setattr(LoadModules, key, getattr(m, key))
             self._get_module = False

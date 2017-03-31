@@ -26,9 +26,9 @@ class Logger:
     _loglevel = 'info'
     _msg_level = {
         'debug': 'DEBUG',
-           'info': 'INFO',
+        'info': 'INFO',
         'warning': 'WARNING',
-          'error': 'ERROR'
+        'error': 'ERROR'
     }
 
     def __new__(cls, *args):
@@ -58,7 +58,8 @@ class Logger:
                 r.append(m)
             else:
                 r.append(json.dumps(m, sort_keys=True, indent=2))
-        return "[ {0} ] {1}: {2}\n".format(str(time.time()), self._msg_level[level], ''.join(r))
+        return "[ {0} ] {1}: {2}\n".format(
+            str(time.time()), self._msg_level[level], ''.join(r))
 
     def debug(self, *message):
         if self.get_level() in ['debug']:
