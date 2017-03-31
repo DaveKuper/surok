@@ -7,10 +7,10 @@ from .discovery import *
 from .store import *
 import jinja2
 import os
-import hashlib
-import urllib3
+# import hashlib
+# import urllib3
 import imp
-import json
+# import json
 import requests
 
 '''
@@ -52,11 +52,19 @@ class Apps:
                   "conf_name": app['conf_name'],
                   "env": os.environ}
             _restart = False
-            for conf in [{'env': x, 'value': self._render(my, app['environments'][x])} for x in app['environments']]:
+            for conf in [{
+                    'env': x,
+                    'value': self._render(
+                        my, app['environments'][x]
+                    )} for x in app['environments']]:
                 if self._store.check_update(conf):
                     _restart = True
                     os.environ[conf['env']] = conf['value']
-            for conf in [{'dest': x, 'value': self._render(my, app['files'][x])} for x in app['files']]:
+            for conf in [{
+                    'dest': x,
+                    'value': self._render(
+                        my, app['files'][x]
+                    )} for x in app['files']]:
                 if self._store.check_update(conf):
                     _restart = True
                     self._logger.info("Write new configuration of ", conf.get('dest'))
@@ -66,17 +74,23 @@ class Apps:
                         f.close()
                     except OSError as err:
                         self._logger.error(
-                            'Config file {0} open or write error. OS error : {1}'.format(conf.get('dest'), err))
+                            'Config file {0} open or write error. OS error : {1}'.format(
+                                conf.get('dest'), err))
                         pass
                     except err:
                         self._logger.error(
-                            'Config file {0} open or write error. Error : {1}'.format(conf.get('dest'), err))
+                            'Config file {0} open or write error. Error : {1}'.format(
+                                conf.get('dest'), err))
                         pass
             if _restart:
                 if self._config['marathon']['restart']:
                     self._restart_self_in_marathon()
                 else:
-                    self._logger.info('Restart ', app.get('reload_cmd'), ' app.\n', os.popen(app['reload_cmd']).read())
+                    self._logger.info(
+                        'Restart ',
+                        app.get('reload_cmd'),
+                        ' app.\n',
+                        os.popen(app['reload_cmd']).read())
         self._store.clear()
 
     def _render(self, my, temp):
@@ -94,7 +108,8 @@ class Apps:
     def _restart_self_in_marathon(self):
         env = os.environ.get('MARATHON_APP_ID')
         if env:
-            r = requests.post('http://' + self._config['marathon']['host'] + '/v2/apps/' + env + '/restart',
+            r = requests.post(
+                'http://' + self._config['marathon']['host'] + '/v2/apps/' + env + '/restart',
                               data={'force': self._config['marathon']['force']})
             if r.status_code != 200:
                 self._logger.error(
@@ -125,12 +140,20 @@ class LoadModules:
                 self._config = Config()
             if not hasattr(self, '_logger'):
                 self._logger = Logger()
-            for module in [os.path.join(self._config['modules'], f) for f in os.listdir(self._config['modules']) if os.path.isfile(os.path.join(self._config['modules'], f))]:
+            for module in [
+                    os.path.join(
+                        self._config['modules'], f) for f in os.listdir(
+                            self._config['modules']) if os.path.isfile(
+                                os.path.join(self._config['modules'], f))]:
                 try:
                     m = imp.load_source('__surok.module__', module)
                 except:
                     self._logger.error('Load module {} failed.'.format(module))
                 finally:
-                    for key in [x for x in dir(m) if type(getattr(m, x)).__name__ == 'function' and not x.startswith('_')]:
+                    for key in [
+                            x for x in dir(m)
+                            if type(
+                                getattr(m, x)
+                            ).__name__ == 'function' and not x.startswith('_')]:
                         setattr(LoadModules, key, getattr(m, key))
             self._get_module = False

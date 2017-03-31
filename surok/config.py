@@ -87,7 +87,8 @@ class _ConfigTemplate(dict):
                 if resvalue is not None and 'do' in type_param:
                     if not self._do_type_set(key, resvalue, param):
                         self._logger.warning(
-                            'Parameter "', key, '" current "', resvalue, '" type is "', type(resvalue).__name__, '" testing failed')
+                            'Parameter "', key, '" current "', resvalue,
+                            '" type is "', type(resvalue).__name__, '" testing failed')
                         resvalue = None
                 if resvalue is not None:
                     conf[key] = resvalue
@@ -344,7 +345,10 @@ class Config(_ConfigTemplate):
 
     def update_apps(self):
         self.apps = {}
-        for app_conf in sorted([os.path.join(self.get('confd'), f) for f in os.listdir(self.get('confd')) if os.path.isfile(os.path.join(self.get('confd'), f))]):
+        for app_conf in sorted(
+                [os.path.join(self.get('confd'), f) for f in os.listdir(
+                    self.get('confd')
+                ) if os.path.isfile(os.path.join(self.get('confd'), f))]):
             app = AppConfig(app_conf)
             self.apps[app['conf_name']] = app
 
@@ -431,7 +435,9 @@ class AppConfig(_ConfigTemplate):
             self._conf['group'] = self._get_default_group()
         if 'dest' in self._conf and 'template' in self._conf:
             self._conf['files'].update(
-                {self._conf.get('dest'): '{{ mod.template(mod.from_file(\'' + self._conf.get('template') + '\')) }}'})
+                {
+                    self._conf.get('dest'): '{{ mod.template(mod.from_file(\'' +
+                    self._conf.get('template') + '\')) }}'})
         for service in self._conf.get('services', {}):
             if service.get('ports'):
                 service.setdefault('tcp', [])

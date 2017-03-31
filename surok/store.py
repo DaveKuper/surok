@@ -48,15 +48,15 @@ class Store(dict):
         new_temp = self._normalize(temp)
         if new_temp.get('dest'):
             self._stores[new_temp['store']].set(new_temp.get('hashid'),
-                                       {'hash': new_temp.get('hash'),
-                                        'dest': new_temp.get('dest')})
+                                                {'hash': new_temp.get('hash'),
+                                                 'dest': new_temp.get('dest')})
         elif new_temp.get('env'):
             self._stores[new_temp['store']].set(new_temp.get('hashid'),
-                                       {'hash': new_temp.get('hash'),
-                                         'env': new_temp.get('env')})
+                                                {'hash': new_temp.get('hash'),
+                                                 'env': new_temp.get('env')})
         else:
             self._stores[new_temp['store']].set(new_temp.get('hashid'),
-                                       {'hash': new_temp.get('hash')})
+                                                {'hash': new_temp.get('hash')})
 
     def delete(self, temp):
         new_temp = self._normalize(temp)
@@ -120,13 +120,15 @@ class Store(dict):
             conf['hashid'] = hashlib.sha1(str('data:' + conf['localid']).encode()).hexdigest()
 
         if 'data' in conf:
-            conf['hash'] = hashlib.sha1(json.dumps(conf['data'], sort_keys=True).encode()).hexdigest()
+            conf['hash'] = hashlib.sha1(
+                json.dumps(conf['data'], sort_keys=True).encode()).hexdigest()
         elif type(conf.get('value')).__name__ == 'str':
             conf['hash'] = hashlib.sha1(conf['value'].encode()).hexdigest()
 
         if not self._stores[conf['store']].enabled():
             self._logger.warning(
-                'Store "{0}" not enabled. Store type change to "memory" for hashid "{1}".'.format(conf['store'], conf['hashid']))
+                'Store "{0}" not enabled. Store type change to "memory" for hashid "{1}".'.format(
+                    conf['store'], conf['hashid']))
             conf['store'] = 'memory'
         return conf
 
@@ -225,7 +227,12 @@ class StoreFiles(_StoreTemplate):
             pass
 
     def keys(self):
-        return [f.split('.')[0] for f in os.listdir(self._config['files']['path']) if os.path.isfile(os.path.join(self._config['files']['path'], f)) and f.split('.')[1] == 'surok']
+        return [f.split('.')[0] for f in os.listdir(
+            self._config['files']['path']
+        ) if os.path.isfile(
+            os.path.join(
+                self._config['files']['path'], f)
+        ) and f.split('.')[1] == 'surok']
 
     def delete(self, key):
         try:
@@ -246,6 +253,7 @@ class StoreMemcached(_StoreTemplate):
     _enabled = False
     _hosts = []
     _mod_memcache = None
+
     def __init__(self, *args):
         super().__init__(*args)
         self._enabled = self._config['memcached']['enabled']
@@ -278,21 +286,31 @@ class StoreMemcached(_StoreTemplate):
 
     def check(self):
         if self._config['memcached']['enabled']:
+            # Shitline
             if self._config['memcached']['discovery']['enabled'] and self._config['memcached']['discovery'].get('service') is not None:
                 service = self._config['memcached']['discovery']['service']
                 app_conf = {'services': [{'name': service}]}
                 if self._config['memcached']['discovery']['group']:
-                    app_conf['services'][0]['group'] = self._config['memcached']['discovery']['group']
+                    app_conf['services'][0]['group'] = self._config[
+                        'memcached']['discovery']['group']
                 app = AppConfig(app_conf)
                 discovery_data = self._discovery.resolve(app)
+                # OMFG
                 if discovery_data.get(service) and discovery_data[service][0].get('name') and discovery_data[service][0].get('tcp'):
-                    hosts = [discovery_data[service][0]['name'] + ':' + discovery_data[service][0]['tcp'][0]]
+                    hosts = [discovery_data[service][0][
+                        'name'] + ':' + discovery_data[service][0]['tcp'][0]]
                 else:
                     if self._config['memcached'].get('host'):
                         hosts = [self._config['memcached']['host']]
                     else:
                         hosts = []
-                if self._store.check_update({'localid': 'memcached_discovery', 'data': hosts, 'store': 'memory'}):
+                if self._store.check_update(
+                        {
+                            'localid': 'memcached_discovery',
+                            'data': hosts,
+                            'store': 'memory'
+                        }
+                ):
                     self._hosts = hosts
                     self._enabled = True
                     self._reconnect()
@@ -339,7 +357,8 @@ class StoreMemcached(_StoreTemplate):
             pass
         except:
             self._logger.error(
-                'Set from "memcached" store failed. Unknown error. Made reconnect\nKey:', key, '\nValue:\n', value)
+                'Set from "memcached" store failed. Unknown error. Made reconnect\nKey:',
+                key, '\nValue:\n', value)
             self.check()
             pass
 
@@ -349,7 +368,8 @@ class StoreMemcached(_StoreTemplate):
             for item in server_item[-1].keys():
                 keys_item = item.split(':')
                 if keys_item[2] == 'number':
-                    for server_dump in self._mc.get_stats(' '.join(['cachedump', keys_item[1], server_item[-1][item]])):
+                    for server_dump in self._mc.get_stats(
+                            ' '.join(['cachedump', keys_item[1], server_item[-1][item]])):
                         mkeys.update(server_dump[-1])
         return mkeys.keys()
 
