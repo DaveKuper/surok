@@ -1,10 +1,9 @@
-# Public names
-__all__ = ['Config', 'AppConfig']
-
 import hashlib
 import json
 import os
 from .logger import Logger
+
+__all__ = ['Config', 'AppConfig']
 
 
 class _ConfigTemplate(dict):
@@ -87,7 +86,8 @@ class _ConfigTemplate(dict):
                 if resvalue is not None and 'do' in type_param:
                     if not self._do_type_set(key, resvalue, param):
                         self._logger.warning(
-                            'Parameter "', key, '" current "', resvalue, '" type is "', type(resvalue).__name__, '" testing failed')
+                            'Parameter "', key, '" current "', resvalue, '" type is "', type(
+                                resvalue).__name__, '" testing failed')
                         resvalue = None
                 if resvalue is not None:
                     conf[key] = resvalue
@@ -99,8 +99,9 @@ class _ConfigTemplate(dict):
             x for x in type_param if x in ['str', 'int', 'bool', 'dict']]
         if type_value:
             if type(value).__name__ not in type_value:
-                self._logger.error('Parameter "', key, '" must be ', type_value,
-                                   ' types, current "', value, '" (', type(value).__name__, ')')
+                self._logger.error(
+                    'Parameter "{0}" must be {1} types, current "'.format(
+                        key, type_value), value, '" (', type(value).__name__, ')')
                 return False
             if 'value' in type_param:
                 if value not in param.get('values', []):
@@ -432,7 +433,8 @@ class AppConfig(_ConfigTemplate):
             self._conf['group'] = self._get_default_group()
         if 'dest' in self._conf and 'template' in self._conf:
             self._conf['files'].update(
-                {self._conf.get('dest'): '{{ mod.template(mod.from_file(\'' + self._conf.get('template') + '\')) }}'})
+                {self._conf.get('dest'):
+                    '{{ mod.template(mod.from_file(\'' + self._conf.get('template') + '\')) }}'})
         for service in self._conf.get('services', {}):
             if service.get('ports'):
                 service.setdefault('tcp', [])

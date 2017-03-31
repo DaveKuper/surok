@@ -1,13 +1,12 @@
-# Public names
-__all__ = ['Store']
-
-from .logger import Logger
-from .config import Config, AppConfig
-from .discovery import Discovery
 import os
 import hashlib
 import json
 import importlib
+from .logger import Logger
+from .config import Config, AppConfig
+from .discovery import Discovery
+
+__all__ = ['Store']
 
 
 class Store(dict):
@@ -290,15 +289,18 @@ class StoreMemcached(_StoreTemplate):
 
     def check(self):
         if self._config['memcached']['enabled']:
-            if self._config['memcached']['discovery']['enabled'] and self._config['memcached']['discovery'].get('service') is not None:
+            if self._config['memcached']['discovery']['enabled'] and self._config[
+                    'memcached']['discovery'].get('service') is not None:
                 service = self._config['memcached']['discovery']['service']
                 app_conf = {'services': [{'name': service}]}
                 if self._config['memcached']['discovery']['group']:
-                    app_conf['services'][0]['group'] = self._config['memcached']['discovery']['group']
+                    app_conf['services'][0]['group'] = self._config[
+                        'memcached']['discovery']['group']
                 app = AppConfig(app_conf)
-                discovery_data = self._discovery.resolve(app)
-                if discovery_data.get(service) and discovery_data[service][0].get('name') and discovery_data[service][0].get('tcp'):
-                    hosts = [discovery_data[service][0]['name'] + ':' + discovery_data[service][0]['tcp'][0]]
+                disc_data = self._discovery.resolve(app)
+                disc_data = disc_data.get(service)
+                if disc_data and disc_data[0].get('name') and disc_data[0].get('tcp'):
+                    hosts = [disc_data[0]['name'] + ':' + disc_data[0]['tcp'][0]]
                 else:
                     if self._config['memcached'].get('host'):
                         hosts = [self._config['memcached']['host']]
@@ -354,7 +356,8 @@ class StoreMemcached(_StoreTemplate):
             pass
         except:
             self._logger.error(
-                'Set from "memcached" store failed. Unknown error. Made reconnect\nKey:', key, '\nValue:\n', value)
+                ('Set from "memcached" store failed. Unknown error. Made reconnect\n'
+                    'Key:'), key, '\nValue:\n', value)
             self.check()
             pass
 
@@ -364,7 +367,8 @@ class StoreMemcached(_StoreTemplate):
             for item in server_item[-1].keys():
                 keys_item = item.split(':')
                 if keys_item[2] == 'number':
-                    for server_dump in self._mc.get_stats(' '.join(['cachedump', keys_item[1], server_item[-1][item]])):
+                    for server_dump in self._mc.get_stats(
+                            ' '.join(['cachedump', keys_item[1], server_item[-1][item]])):
                         mkeys.update(server_dump[-1])
         return mkeys.keys()
 

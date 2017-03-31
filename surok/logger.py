@@ -1,9 +1,8 @@
-# Public names
-__all__ = ['Logger']
-
 import sys
 import json
 import time
+
+__all__ = ['Logger']
 
 
 class Logger:

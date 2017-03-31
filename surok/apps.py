@@ -1,6 +1,3 @@
-# Public names
-__all__ = ['Apps']
-
 import jinja2
 import os
 import imp
@@ -10,6 +7,8 @@ from .logger import Logger
 from .config import Config
 from .discovery import Discovery
 from .store import Store
+
+__all__ = ['Apps']
 
 
 class Apps:

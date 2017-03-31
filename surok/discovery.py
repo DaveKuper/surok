@@ -1,12 +1,11 @@
-# Public names
-__all__ = ['Discovery', 'DiscoveryMesos', 'DiscoveryMarathon']
-
 import dns.resolver
 import dns.query
 import requests
 import dns.exception
 from .config import Config
 from .logger import Logger
+
+__all__ = ['Discovery', 'DiscoveryMesos', 'DiscoveryMarathon']
 
 
 class DiscoveryTemplate:
@@ -140,7 +139,8 @@ class DiscoveryMesos(DiscoveryTemplate):
                 if ports is not None:
                     for port_name in ports:
                         for d in self.do_query_srv(
-                                '_' + port_name + '._' + name + '.' + group + '._' + prot + '.' + domain):
+                                '_{0}._{1}.{2}._{3}.{4}'.format(
+                                    port_name, name, group, prot, domain)):
                             hostname = d['name']
                             serv.setdefault(hostname, {'name': hostname,
                                                        'ip': self.do_query_a(hostname)})
