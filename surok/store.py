@@ -24,10 +24,8 @@ class Store(dict):
         return cls._instance
 
     def __init__(self, *args):
-        if not hasattr(self, '_config'):
-            self._config = Config()
-        if not hasattr(self, '_logger'):
-            self._logger = Logger()
+        self._config = Config()
+        self._logger = Logger()
         if 'memory' not in self._stores:
             self._stores['memory'] = StoreMemory()
         if 'files' not in self._stores:
@@ -142,10 +140,8 @@ class Store(dict):
 class _StoreTemplate(dict):
 
     def __init__(self, *args):
-        if not hasattr(self, '_config'):
-            self._config = Config()
-        if not hasattr(self, '_logger'):
-            self._logger = Logger()
+        self._config = Config()
+        self._logger = Logger()
 
     def __setitem__(self, key, value):
         self.set(key, value)
@@ -196,7 +192,7 @@ class StoreFiles(_StoreTemplate):
     def get(self, key, default=None):
         temp = default
         try:
-            filename = self._config['files']['path'] + '/' + key + '.surok'
+            filename = os.path.join(self._config['files']['path'], key + '.surok')
             if os.path.isfile(filename):
                 f = open(filename, 'r')
                 json_temp = f.read()
@@ -204,11 +200,11 @@ class StoreFiles(_StoreTemplate):
                 temp = json.loads(json_temp)
         except OSError as err:
             self._logger.error(
-                'Get from "files" store failed. OS error: {0}'.format(err))
+                'Get from "files" store failed. OS error: {}'.format(err))
             pass
         except ValueError as err:
             self._logger.error(
-                'Get from "files" store failed. JSON format error: {0}'.format(err))
+                'Get from "files" store failed. JSON format error: {}'.format(err))
             pass
         except:
             self._logger.error('Get from "files" store failed. Unknown error.')
@@ -217,7 +213,7 @@ class StoreFiles(_StoreTemplate):
 
     def set(self, key, value):
         try:
-            f = open(self._config['files']['path'] + '/' + key + '.surok', 'w')
+            f = open(os.path.join(self._config['files']['path'], key + '.surok'), 'w')
             f.write(json.dumps(value, sort_keys=True))
             f.close()
         except OSError as err:
@@ -233,13 +229,13 @@ class StoreFiles(_StoreTemplate):
             pass
 
     def keys(self):
-        return [f.split('.')[0] for f in os.listdir(
+        return [f.split('.', 1)[0] for f in os.listdir(
             self._config['files']['path']) if os.path.isfile(os.path.join(
-                self._config['files']['path'], f)) and f.split('.')[1] == 'surok']
+                self._config['files']['path'], f)) and f.split('.', 1)[1] == 'surok']
 
     def delete(self, key):
         try:
-            os.remove(self._config['files']['path'] + '/' + key + '.surok')
+            os.remove(os.path.join(self._config['files']['path'], key + '.surok'))
         except OSError as err:
             self._logger.error(
                 'Delete from "files" store failed. OS error: {0}'.format(err))
@@ -260,8 +256,7 @@ class StoreMemcached(_StoreTemplate):
     def __init__(self, *args):
         super().__init__(*args)
         self._enabled = self._config['memcached']['enabled']
-        if self._enabled and not hasattr(self, '_discovery'):
-            self._discovery = Discovery()
+        self._discovery = Discovery()
         if args and not hasattr(self, '_store'):
             self._store = args[0]
 
@@ -288,22 +283,21 @@ class StoreMemcached(_StoreTemplate):
             self._disconnect()
 
     def check(self):
-        if self._config['memcached']['enabled']:
-            if self._config['memcached']['discovery']['enabled'] and self._config[
-                    'memcached']['discovery'].get('service') is not None:
-                service = self._config['memcached']['discovery']['service']
+        conf_mc = self._config['memcached']
+        if conf_mc['enabled']:
+            if conf_mc['discovery']['enabled'] and conf_mc['discovery'].get('service') is not None:
+                service = conf_mc['discovery']['service']
                 app_conf = {'services': [{'name': service}]}
-                if self._config['memcached']['discovery']['group']:
-                    app_conf['services'][0]['group'] = self._config[
-                        'memcached']['discovery']['group']
+                if conf_mc['discovery']['group']:
+                    app_conf['services'][0]['group'] = conf_mc['discovery']['group']
                 app = AppConfig(app_conf)
                 disc_data = self._discovery.resolve(app)
                 disc_data = disc_data.get(service)
                 if disc_data and disc_data[0].get('name') and disc_data[0].get('tcp'):
                     hosts = [disc_data[0]['name'] + ':' + disc_data[0]['tcp'][0]]
                 else:
-                    if self._config['memcached'].get('host'):
-                        hosts = [self._config['memcached']['host']]
+                    if conf_mc.get('host'):
+                        hosts = [conf_mc['host']]
                     else:
                         hosts = []
                 if self._store.check_update({
@@ -315,10 +309,10 @@ class StoreMemcached(_StoreTemplate):
                     self._reconnect()
             else:
                 hosts = []
-                if self._config['memcached'].get('host'):
-                    hosts = [self._config['memcached']['host']]
-                elif self._config['memcached'].get('hosts'):
-                    hosts = self._config['memcached']['hosts']
+                if conf_mc.get('host'):
+                    hosts = [conf_mc['host']]
+                elif conf_mc.get('hosts'):
+                    hosts = conf_mc['hosts']
                 if self._mc is None or self._hosts != hosts:
                     self._hosts = hosts
                     self._reconnect()
@@ -326,10 +320,10 @@ class StoreMemcached(_StoreTemplate):
             self._disconnect()
 
     def _disconnect(self):
-            self._enabled = False
-            if self._mc is not None:
-                self._mc.disconnect_all()
-                self._mc = None
+        self._enabled = False
+        if self._mc is not None:
+            self._mc.disconnect_all()
+            self._mc = None
 
     def get(self, key, default=None):
         temp = default

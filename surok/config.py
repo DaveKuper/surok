@@ -21,7 +21,7 @@ class _ConfigTemplate(dict):
         conf = {}
         for k in params.keys():
             if params[k].get('params'):
-                conf[k] = self._init_conf(params[k].get('params'))
+                conf[k] = self._init_conf(params[k]['params'])
             else:
                 value = params[k].get('value')
                 if value is not None:
@@ -32,8 +32,7 @@ class _ConfigTemplate(dict):
         return conf
 
     def __init__(self, *conf_data):
-        if not hasattr(self, '_logger'):
-            self._logger = Logger()
+        self._logger = Logger()
         if self._conf is None:
             self._conf = self._init_conf(self._params)
         for c in conf_data:
@@ -52,7 +51,7 @@ class _ConfigTemplate(dict):
                 self._logger.error('Parameter "', key, '" value "', testvalue,
                                    '" type is "', type(testvalue).__name__, '" not found')
             else:
-                type_param = param.get('type')
+                type_param = param['type']
                 resvalue = []
                 reskeys = []
                 if 'anykeys' in type_param:
@@ -72,7 +71,7 @@ class _ConfigTemplate(dict):
                         if 'dict' in type_param:
                             if param.get('params'):
                                 res = self._set_conf_params(
-                                    oldvalue, testitem, param.get('params'))
+                                    oldvalue, testitem, param['params'])
                                 if res is not None:
                                     resvalue.append(res)
                                     reskeys.append(key_testitem)
@@ -95,8 +94,7 @@ class _ConfigTemplate(dict):
 
     def _test_value(self, key, value, param):
         type_param = param.get('type')
-        type_value = [
-            x for x in type_param if x in ['str', 'int', 'bool', 'dict']]
+        type_value = [x for x in type_param if x in ['str', 'int', 'bool', 'dict']]
         if type_value:
             if type(value).__name__ not in type_value:
                 self._logger.error(
@@ -298,9 +296,9 @@ class Config(_ConfigTemplate):
             'type': ['str', 'dir']
         },
         'default_discovery': {
-            'value': 'mesos_dns',
+            'value': 'none',
             'type': ['str', 'value'],
-            'values': ['mesos_dns', 'marathon_api']
+            'values': ['none', 'mesos_dns', 'marathon_api']
         },
         'loglevel': {
             'value': 'info',
@@ -331,6 +329,7 @@ class Config(_ConfigTemplate):
             domain = self.get('domain')
             if domain is not None:
                 self['mesos'] = {'domain': domain, 'enabled': True}
+                self['default_discovery'] = 'mesos_dns'
             path = self.get('lock_dir')
             if path is not None:
                 self['files'] = {'path': path, 'enabled': True}
@@ -345,8 +344,8 @@ class Config(_ConfigTemplate):
 
     def update_apps(self):
         self.apps = {}
-        for app_conf in sorted([os.path.join(self.get('confd'), f) for f in os.listdir(
-                self.get('confd')) if os.path.isfile(os.path.join(self.get('confd'), f))]):
+        for app_conf in sorted([x for x in [os.path.join(
+                self['confd'], x) for x in os.listdir(self['confd'])] if os.path.isfile(x)]):
             app = AppConfig(app_conf)
             self.apps[app['conf_name']] = app
 
@@ -401,10 +400,10 @@ class AppConfig(_ConfigTemplate):
             'type': ['str']
         },
         'discovery': {
-            'type': ['str']
+            'type': ['str', 'value'],
+            'values': ['none', 'mesos_dns', 'marathon_api']
         },
         'store': {
-            'value': 'memory',
             'type': ['str', 'value'],
             'values': ['memory', 'files', 'memcached']
         },
@@ -426,15 +425,14 @@ class AppConfig(_ConfigTemplate):
 
     def set_config(self, conf_data):
         super().set_config(conf_data)
-        self._conf.setdefault(
-            'discovery', self._config.get('default_discovery'))
-        self._conf.setdefault('store', self._config.get('default_store'))
+        self._conf.setdefault('discovery', self._config['default_discovery'])
+        self._conf.setdefault('store', self._config['default_store'])
         if 'group' not in self._conf:
             self._conf['group'] = self._get_default_group()
         if 'dest' in self._conf and 'template' in self._conf:
             self._conf['files'].update(
-                {self._conf.get('dest'):
-                    '{{ mod.template(mod.from_file(\'' + self._conf.get('template') + '\')) }}'})
+                {self._conf['dest']:
+                    '{{ mod.template(mod.from_file("{}")) }}'.format(self._conf['template'])})
         for service in self._conf.get('services', {}):
             if service.get('ports'):
                 service.setdefault('tcp', [])

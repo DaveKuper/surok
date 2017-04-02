@@ -1,5 +1,10 @@
 surok/__pycache__
+modules/__pycache__
 __pycache__
 *.pyc
 *.swp
 selfcheck
+build/Dockerfile.builder
+build/Dockerfile.surok
+build/surok
+build/out

@@ -11,10 +11,8 @@ __all__ = ['Discovery', 'DiscoveryMesos', 'DiscoveryMarathon']
 class DiscoveryTemplate:
 
     def __init__(self):
-        if not hasattr(self, '_config'):
-            self._config = Config()
-        if not hasattr(self, '_logger'):
-            self._logger = Logger()
+        self._config = Config()
+        self._logger = Logger()
 
     def enabled(self):
         return self._config[self._config_section].get('enabled', False)
@@ -63,27 +61,27 @@ class Discovery:
         return cls._instance
 
     def __init__(self):
-        if not hasattr(self, '_config'):
-            self._config = Config()
-        if not hasattr(self, '_logger'):
-            self._logger = Logger()
+        self._config = Config()
+        self._logger = Logger()
         if 'mesos_dns' not in self._discoveries:
             self._discoveries['mesos_dns'] = DiscoveryMesos()
         if 'marathon_api' not in self._discoveries:
             self._discoveries['marathon_api'] = DiscoveryMarathon()
+        if 'none' not in self._discoveries:
+            self._discoveries['none'] = DiscoveryNone()
 
     def keys(self):
         return self._discoveries.keys()
 
     def resolve(self, app):
-        discovery = app.get('discovery', self._config.get('default_discovery'))
-        if discovery not in self.keys():
-            self._logger.warning('Discovery "', discovery, '" is not present')
-            return {}
-        if self._discoveries[discovery].enabled():
-            return self.compatible(self._discoveries[discovery].resolve(app))
+        discovery = app.get('discovery', self._config['default_discovery'])
+        if discovery in self.keys():
+            if self._discoveries[discovery].enabled():
+                return self.compatible(self._discoveries[discovery].resolve(app))
+            else:
+                self._logger.error('Discovery "{}" is disabled'.format(discovery))
         else:
-            self._logger.error('Discovery "', discovery, '" is disabled')
+            self._logger.warning('Discovery "{}" is not present'.format(discovery))
         return {}
 
     def update_data(self):
@@ -101,10 +99,9 @@ class Discovery:
                     if type(ports).__name__ == 'list':
                         compatible_hosts[service] = []
                         for port in ports:
-                            compatible_hosts[service].append(
-                                {'name': host['name'],
-                                 'ip': host['ip'],
-                                 'port': str(port)})
+                            compatible_hosts[service].append({'name': host['name'],
+                                                              'ip': host['ip'],
+                                                              'port': str(port)})
                     else:
                         compatible_hosts[service] = {}
                         for port in ports.keys():
@@ -122,10 +119,9 @@ class DiscoveryMesos(DiscoveryTemplate):
 
     def resolve(self, app):
         hosts = {}
-        services = app.get('services')
         domain = self._config['mesos']['domain']
-        for service in services:
-            group = service.get('group', app.get('group'))
+        for service in app['services']:
+            group = service.get('group', app['group'])
             if group is None:
                 self._logger.error(
                     'Group for service "{}" of config "{}" not found'.format(
@@ -138,24 +134,22 @@ class DiscoveryMesos(DiscoveryTemplate):
                 ports = service.get(prot)
                 if ports is not None:
                     for port_name in ports:
-                        for d in self.do_query_srv(
+                        for hostname, port in [(x['name'], x['port']) for x in self.do_query_srv(
                                 '_{0}._{1}.{2}._{3}.{4}'.format(
-                                    port_name, name, group, prot, domain)):
-                            hostname = d['name']
-                            serv.setdefault(hostname, {'name': hostname,
-                                                       'ip': self.do_query_a(hostname)})
+                                    port_name, name, group, prot, domain))]:
+                            if hostname not in serv:
+                                serv[hostname] = {'name': hostname,
+                                                  'ip': self.do_query_a(hostname)}
                             serv[hostname].setdefault(prot, {})
-                            serv[hostname][prot][port_name] = d['port']
+                            serv[hostname][prot][port_name] = port
                 else:
-                    for d in self.do_query_srv(
-                            '_' + name + '.' + group + '._' + prot + '.' + domain):
-                        hostname = d['name']
-                        if serv.get(hostname) is None:
+                    for hostname, port in [(x['name'], x['port']) for x in self.do_query_srv(
+                            '_{0}.{1}._{2}.{3}'.format(name, group, prot, domain))]:
+                        if hostname not in serv:
                             serv[hostname] = {'name': hostname,
                                               'ip': self.do_query_a(hostname)}
-                        if serv[hostname].get(prot) is None:
-                            serv[hostname][prot] = []
-                        serv[hostname][prot].extend([d['port']])
+                        serv[hostname].setdefault(prot, [])
+                        serv[hostname][prot].append(port)
             hosts[name] = list(serv.values())
         return hosts
 
@@ -176,13 +170,13 @@ class DiscoveryMarathon(DiscoveryTemplate):
             self._ports = ports
         except:
             self._logger.warning(
-                'Apps (', hostname, '/v2/apps) request from Marathon API is failed')
+                'Apps ({}/v2/apps) request from Marathon API is failed'.format(hostname))
             pass
         try:
             self._tasks = requests.get(hostname + '/v2/tasks').json()['tasks']
         except:
             self._logger.warning(
-                'Tasks (', hostname, '/v2/tasks) request from Marathon API is failed')
+                'Tasks ({}/v2/tasks) request from Marathon API is failed'.format(hostname))
             pass
 
     def _test_mask(self, mask, value):
@@ -199,7 +193,7 @@ class DiscoveryMarathon(DiscoveryTemplate):
             if group is None:
                 self._logger.error(
                     'Group for service "{}" of config "{}" not found'.format(
-                        service['name'], app.get('conf_name')))
+                        service['name'], app['conf_name']))
                 continue
             group = '/' + '/'.join(group.split('.')[::-1]) + '/'
             service_mask = group + service['name']
@@ -216,15 +210,29 @@ class DiscoveryMarathon(DiscoveryTemplate):
                         if prot in service:
                             for port_mask in service.get(prot, []):
                                 if self._test_mask(port_mask, port_name):
-                                    serv.setdefault(
-                                        hostname, {'name': hostname,
-                                                   'ip': self.do_query_a(hostname)})
+                                    if hostname not in serv:
+                                        serv[hostname] = {'name': hostname,
+                                                          'ip': self.do_query_a(hostname)}
                                     serv[hostname].setdefault(prot, {})
                                     serv[hostname][prot][port_name] = port
                         else:
-                            serv.setdefault(hostname, {'name': hostname,
-                                                       'ip': self.do_query_a(hostname)})
+                            if hostname not in serv:
+                                serv[hostname] = {'name': hostname,
+                                                  'ip': self.do_query_a(hostname)}
                             serv[hostname].setdefault(prot, [])
                             serv[hostname][prot].extend([port])
                     hosts[name] = list(serv.values())
         return hosts
+
+
+class DiscoveryNone(DiscoveryTemplate):
+    _config_section = 'none'
+
+    def __init__(self):
+        pass
+
+    def resolve(self, app):
+        return {}
+
+    def enabled(self):
+        return True

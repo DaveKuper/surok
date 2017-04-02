@@ -27,35 +27,31 @@ class Apps:
     """
 
     def __init__(self):
-        if not hasattr(self, '_config'):
-            self._config = Config()
-        if not hasattr(self, '_logger'):
-            self._logger = Logger()
-        if not hasattr(self, '_store'):
-            self._store = Store()
-        if not hasattr(self, '_discovery'):
-            self._discovery = Discovery()
+        self._config = Config()
+        self._logger = Logger()
+        self._store = Store()
+        self._discovery = Discovery()
 
     def update(self):
         self._discovery.update_data()
         self._store.check()
-        for app in [self._config.apps[x] for x in self._config.apps]:
+        for conf_name, app in self._config.apps.items():
             my = {"services": self._discovery.resolve(app),
-                  "conf_name": app['conf_name'],
+                  "conf_name": conf_name,
                   "env": os.environ,
                   "timestamp": time.time()}
             _restart = False
             for conf in [{
-                            'env': x,
-                            'value': self._render(my, app['environments'][x])
-                        } for x in app['environments']]:
+                            'env': x[0],
+                            'value': self._render(my, x[1])
+                        } for x in app['environments'].items()]:
                 if self._store.check_update(conf):
                     _restart = True
                     os.environ[conf['env']] = conf['value']
             for conf in [{
-                            'dest': x,
-                            'value': self._render(my, app['files'][x])
-                        } for x in app['files']]:
+                            'dest': x[0],
+                            'value': self._render(my, x[1])
+                        } for x in app['files'].items()]:
                 if self._store.check_update(conf):
                     _restart = True
                     self._logger.info("Write new configuration of ", conf.get('dest'))
@@ -122,10 +118,8 @@ class LoadModules:
             else:
                 setattr(LoadModules, key, pars[key])
         if self._get_module:
-            if not hasattr(self, '_config'):
-                self._config = Config()
-            if not hasattr(self, '_logger'):
-                self._logger = Logger()
+            self._config = Config()
+            self._logger = Logger()
             for module in [os.path.join(self._config['modules'], f) for f in os.listdir(
                     self._config['modules']) if os.path.isfile(
                         os.path.join(self._config['modules'], f))]:

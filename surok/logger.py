@@ -6,7 +6,6 @@ __all__ = ['Logger']
 
 
 class Logger:
-
     """ Public Logger oblect
     ==================================================
     .set_level(level) - set level messages

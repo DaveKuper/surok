@@ -11,30 +11,15 @@ import surok.logger
 import surok.discovery
 import surok.store
 
-class Config(surok.config.Config):
-    def __init__(self, *conf_data):
-        self._logger = Logger()
-        super().__init__(*conf_data)
-
-    def clear(self):
-        self._conf = None
-        self.__init__()
-
-    def update_apps(self):
-        self.apps={}
-        for app_conf in sorted([os.path.join(self.get('confd'), f) for f in os.listdir(self.get('confd')) if os.path.isfile(os.path.join(self.get('confd'), f))]):
-            app = AppConfig(app_conf)
-            self.apps[app['conf_name']] = app
-
-class AppConfig(surok.config.AppConfig):
-    def __init__(self, *conf_data):
-        self._config = Config()
-        self._logger = Logger()
-        super().__init__(*conf_data)
-
 class Logger(surok.logger.Logger):
     _out=''
     _err=''
+    def __new__(cls, *args):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            surok.logger.Logger._instance = cls._instance
+        return cls._instance
+
     def _log2err(self,out):
         self._err+=out
 
@@ -51,6 +36,17 @@ class Logger(surok.logger.Logger):
         self._err=''
         self._out=''
 
+class Config(surok.config.Config):
+    def __new__(cls, *args):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            surok.config.Config._instance = cls._instance
+        return cls._instance
+
+    def clear(self):
+        self._conf = None
+        self.__init__()
+
 class DiscoveryTestingTemplate:
     _testing={}
     _testing_fqdn_a={
@@ -61,11 +57,6 @@ class DiscoveryTestingTemplate:
         "localhost": ['127.0.0.1']
     }
     _testing_fqdn_srv={}
-
-    def __init__(self):
-        self._config = Config()
-        self._logger = Logger()
-        super().__init__()
 
     def do_query_a(self,fqdn):
         res=self._testing_fqdn_a.get(fqdn,[])
@@ -85,14 +76,14 @@ class DiscoveryTestingTemplate:
 
     def update_data(self):
         class_name=self.__class__.__name__
-        tgen={
-          "name": ["zzz0","zzy0","zzy1","zzz1"],
-          "host": ["test.zzz0.test","test.zzz1.test","test.zzz2.test","test.zzz3.test"],
-          "serv": ["tname_aa","tname_ab","tname_ba","tname_bb"],
-          "ports": [12341,12342,12343,12344],
-          "servicePorts": [21221,21222,21223,21224]
-        }
         if self._testing.get(class_name,True):
+            tgen={
+              "name": ["zzz0","zzy0","zzy1","zzz1"],
+              "host": ["test.zzz0.test","test.zzz1.test","test.zzz2.test","test.zzz3.test"],
+              "serv": ["tname_aa","tname_ab","tname_ba","tname_bb"],
+              "ports": [12341,12342,12343,12344],
+              "servicePorts": [21221,21222,21223,21224]
+            }
             if class_name == 'DiscoveryMarathon':
                 _tasks=[]
                 _ports={}
@@ -148,57 +139,33 @@ class DiscoveryMarathon(DiscoveryTestingTemplate, surok.discovery.DiscoveryMarat
     pass
 
 class Discovery(surok.discovery.Discovery):
+    def __new__(cls, *args):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            surok.discovery.Discovery._instance = cls._instance
+        return cls._instance
+
     def __init__(self):
-        self._config = Config()
-        self._logger = Logger()
         if 'mesos_dns' not in self._discoveries:
             self._discoveries['mesos_dns'] = DiscoveryMesos()
         if 'marathon_api' not in self._discoveries:
             self._discoveries['marathon_api'] = DiscoveryMarathon()
         super().__init__()
 
-class StoreMemory(surok.store.StoreMemory):
-    def __init__(self, *args):
-        self._config = Config()
-        self._logger = Logger()
-        super().__init__(*args)
-
-class StoreFiles(surok.store.StoreFiles):
-    def __init__(self, *args):
-        self._config = Config()
-        self._logger = Logger()
-        super().__init__(*args)
-
-class StoreMemcached(surok.store.StoreMemcached):
-    def __init__(self, *args):
-        self._config = Config()
-        self._logger = Logger()
-        self._discovery = Discovery()
-        super().__init__(*args)
 
 class Store(surok.store.Store):
-    def __init__(self, *args):
-        self._config = Config()
-        self._logger = Logger()
-        if 'memory' not in self._stores:
-            self._stores['memory'] = StoreMemory()
-        if 'files' not in self._stores:
-            self._stores['files'] = StoreFiles()
-        if 'memcached' not in self._stores:
-            self._stores['memcached'] = StoreMemcached(self)
-        super().__init__(*args)
+    def __new__(cls, *args):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            surok.store.Store._instance = cls._instance
+        return cls._instance
 
 class LoadModules(surok.apps.LoadModules):
-    pass
-
-class Apps(surok.apps.Apps):
-    def __init__(self):
-        self._config = Config()
-        self._logger = Logger()
-        self._store = Store()
-        self._discovery = Discovery()
-        self._loadmodule = LoadModules()
-        super().__init__()
+    def __new__(cls, *args):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            surok.apps.LoadModules._instance = cls._instance
+        return cls._instance
 
 class Test01_Logger(unittest.TestCase):
     def test_01_logger_default_level(self):
@@ -246,7 +213,7 @@ class Test02_LoadConfig(unittest.TestCase):
         config=Config()
         with self.subTest(msg="Testing default values for Config...\nConfig:\n" + config.dump()):
             self.assertEqual(config.get('confd'), '/etc/surok/conf.d')
-            self.assertEqual(config.get('default_discovery'), 'mesos_dns')
+            self.assertEqual(config.get('default_discovery'), 'none')
             self.assertEqual(config.get('loglevel'), 'info')
             self.assertEqual(dict(config.get('marathon',{})).get('enabled'), False)
             self.assertEqual(dict(config.get('mesos',{})).get('enabled'), False)
@@ -277,17 +244,17 @@ class Test02_LoadConfig(unittest.TestCase):
         tests=[
             {
                 'env':{},
-                'self_check.json': 'c264d23a99facee701d68b90e1df590c1fc19d58',
+                'self_check.json': 'c0e449a197354224f187bc0d907001397afcd36d',
                 'marathon_check.json': '02ababe60de38f4bf527e604963d64857c8f8230'
             },
             {
                 'env':{'SUROK_DISCOVERY_GROUP': 'xxx.yyy'},
-                'self_check.json': 'e92c0982cce5b562f6e2cf09fb0776f6c3c76cf7',
+                'self_check.json': 'a5351afd564f83321a32cfcdb0f837f818e5164f',
                 'marathon_check.json': '2e429365260af51b0da36a51ca3a601ee7409143'
             },
             {
                 'env':{'MARATHON_APP_ID': '/yyy/xxx/zzz'},
-                'self_check.json': 'e92c0982cce5b562f6e2cf09fb0776f6c3c76cf7',
+                'self_check.json': 'a5351afd564f83321a32cfcdb0f837f818e5164f',
                 'marathon_check.json': '2e429365260af51b0da36a51ca3a601ee7409143'
             }
         ]
@@ -307,7 +274,7 @@ class Test02_LoadConfig(unittest.TestCase):
                 'assertNotEqual': [20, '/var/tmp1', '/etc/surok/conf/surok.json', 1, None, True]
             },
             'default_discovery':{
-                'assertEqual':['marathon_api', 'mesos_dns'],
+                'assertEqual':['none', 'marathon_api', 'mesos_dns'],
                 'assertNotEqual':[20, 'test', None]
             },
             'loglevel':{
@@ -353,6 +320,10 @@ class Test03_Discovery(unittest.TestCase):
                         'marathon_api':{
                             'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
                             'self_check.json':'53b8ddc27e357620f01ea75a7ab827cd90c77446'
+                        },
+                        'none':{
+                            'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     },
                     '0.8':{
@@ -363,6 +334,10 @@ class Test03_Discovery(unittest.TestCase):
                         'marathon_api':{
                             'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
                             'self_check.json':'27c0ffd26da16ccaf63280946076e39265e0b3e8'
+                        },
+                        'none':{
+                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     }
                 },
@@ -375,6 +350,10 @@ class Test03_Discovery(unittest.TestCase):
                         'marathon_api':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
+                        },
+                        'none':{
+                            'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     },
                     '0.8':{
@@ -383,6 +362,10 @@ class Test03_Discovery(unittest.TestCase):
                             'self_check.json':'27c0ffd26da16ccaf63280946076e39265e0b3e8'
                         },
                         'marathon_api':{
+                            'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
+                        },
+                        'none':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
@@ -399,6 +382,10 @@ class Test03_Discovery(unittest.TestCase):
                         'marathon_api':{
                             'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
                             'self_check.json':'53b8ddc27e357620f01ea75a7ab827cd90c77446'
+                        },
+                        'none':{
+                            'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     },
                     '0.8':{
@@ -409,6 +396,10 @@ class Test03_Discovery(unittest.TestCase):
                         'marathon_api':{
                             'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
                             'self_check.json':'27c0ffd26da16ccaf63280946076e39265e0b3e8'
+                        },
+                        'none':{
+                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     }
                 },
@@ -421,6 +412,10 @@ class Test03_Discovery(unittest.TestCase):
                         'marathon_api':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
+                        },
+                        'none':{
+                            'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     },
                     '0.8':{
@@ -429,6 +424,10 @@ class Test03_Discovery(unittest.TestCase):
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         },
                         'marathon_api':{
+                            'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
+                            'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
+                        },
+                        'none':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
@@ -514,17 +513,17 @@ class Test04_Store(unittest.TestCase):
         tests = [
             {
                 'name': 'memory',
-                'store': StoreMemory()
+                'store': surok.store.StoreMemory()
             },
             {
                 'enabled': True,
                 'name': 'files',
-                'store': StoreFiles()
+                'store': surok.store.StoreFiles()
             },
             {
                 'enabled': True,
                 'name': 'memcached',
-                'store': StoreMemcached()
+                'store': surok.store.StoreMemcached()
             }
         ]
 
@@ -732,13 +731,13 @@ class Test05_Apps(unittest.TestCase):
         config['env'] = {'SUROK_DISCOVERY_GROUP': 'xxx.yyy'}
         logger = Logger()
         logger.reset()
-        apps = Apps()
+        apps = surok.apps.Apps()
         apps.update()
         tests = {
             '/tmp/test_1': '162165ae96553d94b803728bb870e571c304de5d',
             '/tmp/test_2': 'e899d5ee7c5dd11e614a7c67abbb47f3ab1646fc',
             '/tmp/test_cmd': 'a325fb4bca52825ff80289a49f8a6fe2df32ff08',
-            '/tmp/test_old': '4afc5ac4f1a2f0ec45596b798c311fe1fc9bfbbf'
+            '/tmp/test_old': '279edab3d4c49b1d5347397323d18d40c9eb54cb'
         }
         tests_2 = {
             '/tmp/test_1': '162165ae96553d94b803728bb870e571c304de5d',

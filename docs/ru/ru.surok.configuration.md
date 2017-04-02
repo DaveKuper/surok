@@ -70,11 +70,12 @@
     * для файлового хранилища "files"
       * **path** - *string. Абсолютный путь к хранилищу.*
 
-* **default_discovery** - *string. Не обязательный. По умолчанию "mesos_dns".*
+* **default_discovery** - *string. Не обязательный. По умолчанию "none"(для версии 0.7 "mesos_dns").*
 
   Может принимать значения:
   * "mesos_dns" - Mesos DNS
   * "marathon_api"- Marathon API
+  * "none" - Не использовать
 * **default_store** - *string. Не обязательный. По умолчанию "memory".*
 
   Может принимать значения:
