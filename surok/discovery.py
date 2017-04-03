@@ -74,14 +74,15 @@ class Discovery:
         return self._discoveries.keys()
 
     def resolve(self, app):
-        discovery = app.get('discovery', self._config['default_discovery'])
-        if discovery in self.keys():
-            if self._discoveries[discovery].enabled():
-                return self.compatible(self._discoveries[discovery].resolve(app))
+        if app['services']:
+            discovery = app.get('discovery', self._config['default_discovery'])
+            if discovery in self.keys():
+                if self._discoveries[discovery].enabled():
+                    return self.compatible(self._discoveries[discovery].resolve(app))
+                else:
+                    self._logger.error('Discovery "{}" is disabled'.format(discovery))
             else:
-                self._logger.error('Discovery "{}" is disabled'.format(discovery))
-        else:
-            self._logger.warning('Discovery "{}" is not present'.format(discovery))
+                self._logger.warning('Discovery "{}" is not present'.format(discovery))
         return {}
 
     def update_data(self):
@@ -184,17 +185,14 @@ class DiscoveryMarathon(DiscoveryTemplate):
 
     def resolve(self, app):
         hosts = {}
-        services = app.get('services')
-        if not services:
-            services = [{'name': '*', 'tcp': ['*'], 'udp': ['*']}]
-        for service in services:
-            # Convert xxx.yyy.zzz to /zzz/yyy/xxx/ format
+        for service in app['services']:
             group = service.get('group', app.get('group'))
             if group is None:
                 self._logger.error(
                     'Group for service "{}" of config "{}" not found'.format(
                         service['name'], app['conf_name']))
                 continue
+            # Convert xxx.yyy.zzz to /zzz/yyy/xxx/ format
             group = '/' + '/'.join(group.split('.')[::-1]) + '/'
             service_mask = group + service['name']
             for task in self._tasks:
