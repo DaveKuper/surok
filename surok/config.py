@@ -432,7 +432,7 @@ class AppConfig(_ConfigTemplate):
         if 'dest' in self._conf and 'template' in self._conf:
             self._conf['files'].update(
                 {self._conf['dest']:
-                    '{{ mod.template(mod.from_file("{}")) }}'.format(self._conf['template'])})
+                    '{{ mod.template(mod.from_file("' + self._conf['template'] + '")) }}'})
         for service in self._conf.get('services', {}):
             if service.get('ports'):
                 service.setdefault('tcp', [])

@@ -244,17 +244,17 @@ class Test02_LoadConfig(unittest.TestCase):
         tests=[
             {
                 'env':{},
-                'self_check.json': 'c0e449a197354224f187bc0d907001397afcd36d',
+                'self_check.json': '2035f33627b9f27967dc8a1773b274219fc9f09d',
                 'marathon_check.json': '02ababe60de38f4bf527e604963d64857c8f8230'
             },
             {
                 'env':{'SUROK_DISCOVERY_GROUP': 'xxx.yyy'},
-                'self_check.json': 'a5351afd564f83321a32cfcdb0f837f818e5164f',
+                'self_check.json': '5b78740866e58101081bc1d23e7c76f99a0e8cc3',
                 'marathon_check.json': '2e429365260af51b0da36a51ca3a601ee7409143'
             },
             {
                 'env':{'MARATHON_APP_ID': '/yyy/xxx/zzz'},
-                'self_check.json': 'a5351afd564f83321a32cfcdb0f837f818e5164f',
+                'self_check.json': '5b78740866e58101081bc1d23e7c76f99a0e8cc3',
                 'marathon_check.json': '2e429365260af51b0da36a51ca3a601ee7409143'
             }
         ]
@@ -737,7 +737,7 @@ class Test05_Apps(unittest.TestCase):
             '/tmp/test_1': '162165ae96553d94b803728bb870e571c304de5d',
             '/tmp/test_2': 'e899d5ee7c5dd11e614a7c67abbb47f3ab1646fc',
             '/tmp/test_cmd': 'a325fb4bca52825ff80289a49f8a6fe2df32ff08',
-            '/tmp/test_old': '279edab3d4c49b1d5347397323d18d40c9eb54cb'
+            '/tmp/test_old': '4afc5ac4f1a2f0ec45596b798c311fe1fc9bfbbf'
         }
         tests_2 = {
             '/tmp/test_1': '162165ae96553d94b803728bb870e571c304de5d',
