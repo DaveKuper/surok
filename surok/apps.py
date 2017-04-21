@@ -35,7 +35,8 @@ class Apps:
     def update(self):
         self._discovery.update_data()
         self._store.check()
-        for conf_name, app in self._config.apps.items():
+        for conf_name in sorted(self._config.apps):
+            app = self._config.apps[conf_name]
             my = {"services": self._discovery.resolve(app),
                   "conf_name": conf_name,
                   "env": os.environ,
