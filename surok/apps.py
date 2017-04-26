@@ -105,6 +105,8 @@ class Apps:
 class LoadModules:
     _instance = None
     _get_module = True
+    _orig = {}
+    _logs = []
 
     def __new__(cls, **pars):
         if cls._instance is None:
@@ -118,12 +120,13 @@ class LoadModules:
                     delattr(LoadModules, key)
             else:
                 setattr(LoadModules, key, pars[key])
+        self._logerror = False
         if self._get_module:
             self._config = Config()
             self._logger = Logger()
-            for module in [os.path.join(self._config['modules'], f) for f in os.listdir(
-                    self._config['modules']) if os.path.isfile(
-                        os.path.join(self._config['modules'], f))]:
+            mpath = self._config['modules']
+            for module in [os.path.join(mpath, f) for f in os.listdir(
+                    mpath) if os.path.isfile(os.path.join(mpath, f))]:
                 try:
                     m = imp.load_source('__surok.module__', module)
                 except:
@@ -131,5 +134,49 @@ class LoadModules:
                 finally:
                     for key in [x for x in dir(m) if type(
                             getattr(m, x)).__name__ == 'function' and not x.startswith('_')]:
-                        setattr(LoadModules, key, getattr(m, key))
+                        self._orig[key] = _ExecModule(self, key, getattr(m, key))
+                        setattr(LoadModules, key, self._orig[key].execute)
             self._get_module = False
+
+    def _error(self):
+        self._logerror = True
+        self.dump_logs()
+
+    def dump_logs(self):
+        if self._logerror:
+            for log in self._logs:
+                self._logger.error(*log)
+        else:
+            for log in self._logs:
+                self._logger.debug(*log)
+        self._logs = []
+
+
+class _ExecModule:
+
+    def __init__(self, *args):
+        self.modules, self.name, self.function = args
+
+    def get_error(self):
+        return self.modules._logerror
+
+    def addlogs(self, *log):
+        self.modules._logs.append(log)
+
+    def execute(self, *args, **kwargs):
+        if self.get_error():
+            self.addlogs('Not execute module: ', self.name)
+        else:
+            result = None
+            self.addlogs('Execute module: ', self.name)
+            self.addlogs('args: ', args)
+            self.addlogs('kwargs: ', kwargs)
+            try:
+                result = self.function(self.modules, *args, **kwargs)
+            except:
+                self.modules._error()
+            if self.get_error():
+                self.addlogs('Failed execute: ', self.name)
+            else:
+                self.addlogs('Return: ', result)
+            return result
