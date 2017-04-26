@@ -42,6 +42,7 @@ class Apps:
                   "env": os.environ,
                   "timestamp": time.time()}
             _restart = False
+            self._error = False
             for conf in [{
                             'env': x[0],
                             'value': self._render(my, x[1])
@@ -70,24 +71,29 @@ class Apps:
                             'Config file {0} open or write error. Error : {1}'.format(
                                 conf.get('dest'), err))
                         pass
-            if _restart:
+            if _restart and not self._error:
                 if self._config['marathon']['restart']:
                     self._restart_self_in_marathon()
                 else:
-                    self._logger.info('Restart {0} app:\n{1}'.format(
-                        app.get('reload_cmd'), os.popen(app['reload_cmd']).read()))
+                    if app.get('reload_cmd'):
+                        self._logger.info('Restart "{0}" app:\n{1}'.format(
+                            app['reload_cmd'], os.popen(app['reload_cmd']).read()))
         self._store.clear()
 
     def _render(self, my, temp):
         if type(temp).__name__ == 'str':
             data = None
+            mod = LoadModules(_my=my)
             try:
                 template = jinja2.Template(temp)
-                data = template.render(my=my, mod=LoadModules(_my=my))
+                data = template.render(my=my, mod=mod)
             except jinja2.UndefinedError as err:
                 self._logger.error('Render Jinja2 error. ', err)
             except:
                 self._logger.error('Render Jinja2 error. Unknown error')
+            finally:
+                mod.dump_logs()
+                self._error = mod.get_error()
             return data
 
     def _restart_self_in_marathon(self):
@@ -150,6 +156,9 @@ class LoadModules:
             for log in self._logs:
                 self._logger.debug(*log)
         self._logs = []
+
+    def get_error(self):
+        return self._logerror
 
 
 class _ExecModule:

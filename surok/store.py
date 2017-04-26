@@ -287,7 +287,7 @@ class StoreMemcached(_StoreTemplate):
         if conf_mc['enabled']:
             if conf_mc['discovery']['enabled'] and conf_mc['discovery'].get('service') is not None:
                 service = conf_mc['discovery']['service']
-                app_conf = {'services': [{'name': service}]}
+                app_conf = {'services': [{'name': service, 'tcp':[]}]}
                 if conf_mc['discovery']['group']:
                     app_conf['services'][0]['group'] = conf_mc['discovery']['group']
                 app = AppConfig(app_conf)

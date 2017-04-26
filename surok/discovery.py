@@ -131,9 +131,9 @@ class DiscoveryMesos(DiscoveryTemplate):
             name = service['name']
             hosts[name] = {}
             serv = hosts[name]
-            for prot in ['tcp', 'udp']:
-                ports = service.get(prot)
-                if ports is not None:
+            for prot in [x for x in ['tcp', 'udp'] if x in service]:
+                ports = service[prot]
+                if len(ports):
                     for port_name in ports:
                         for hostname, port in [(x['name'], x['port']) for x in self.do_query_srv(
                                 '_{0}._{1}.{2}._{3}.{4}'.format(
@@ -206,19 +206,21 @@ class DiscoveryMarathon(DiscoveryTemplate):
                         port_name = task_port['name']
                         port = task['ports'][task['servicePorts'].index(task_port['servicePort'])]
                         if prot in service:
-                            for port_mask in service.get(prot, []):
-                                if self._test_mask(port_mask, port_name):
-                                    if hostname not in serv:
-                                        serv[hostname] = {'name': hostname,
-                                                          'ip': self.do_query_a(hostname)}
-                                    serv[hostname].setdefault(prot, {})
-                                    serv[hostname][prot][port_name] = port
-                        else:
-                            if hostname not in serv:
-                                serv[hostname] = {'name': hostname,
-                                                  'ip': self.do_query_a(hostname)}
-                            serv[hostname].setdefault(prot, [])
-                            serv[hostname][prot].extend([port])
+                            ports = service.get(prot, [])
+                            if len(ports):
+                                for port_mask in service.get(prot, []):
+                                    if self._test_mask(port_mask, port_name):
+                                        if hostname not in serv:
+                                            serv[hostname] = {'name': hostname,
+                                                              'ip': self.do_query_a(hostname)}
+                                        serv[hostname].setdefault(prot, {})
+                                        serv[hostname][prot][port_name] = port
+                            else:
+                                if hostname not in serv:
+                                    serv[hostname] = {'name': hostname,
+                                                      'ip': self.do_query_a(hostname)}
+                                serv[hostname].setdefault(prot, [])
+                                serv[hostname][prot].extend([port])
                     hosts[name] = list(serv.values())
         return hosts
 

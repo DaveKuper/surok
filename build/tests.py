@@ -315,11 +315,11 @@ class Test03_Discovery(unittest.TestCase):
                     '0.7':{                                                                         #version
                         'mesos_dns':{                                                               #default_discovery
                             'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',       #app['conf_name']
-                            'self_check.json':'53b8ddc27e357620f01ea75a7ab827cd90c77446'
+                            'self_check.json':'6239f6da032f241d4360bd1af299f28f10fe9d12'
                         },
                         'marathon_api':{
                             'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
-                            'self_check.json':'53b8ddc27e357620f01ea75a7ab827cd90c77446'
+                            'self_check.json':'6239f6da032f241d4360bd1af299f28f10fe9d12'
                         },
                         'none':{
                             'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
@@ -328,15 +328,15 @@ class Test03_Discovery(unittest.TestCase):
                     },
                     '0.8':{
                         'mesos_dns':{
-                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
-                            'self_check.json':'27c0ffd26da16ccaf63280946076e39265e0b3e8'
+                            'marathon_check.json':'c132c8708b8fcbf7598153fc7eeafe23fd83a504',
+                            'self_check.json':'cb16e09a861acfd47d458342f0d7259b4401b76d'
                         },
                         'marathon_api':{
-                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
-                            'self_check.json':'27c0ffd26da16ccaf63280946076e39265e0b3e8'
+                            'marathon_check.json':'c132c8708b8fcbf7598153fc7eeafe23fd83a504',
+                            'self_check.json':'cb16e09a861acfd47d458342f0d7259b4401b76d'
                         },
                         'none':{
-                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
+                            'marathon_check.json':'c132c8708b8fcbf7598153fc7eeafe23fd83a504',
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     }
@@ -345,7 +345,7 @@ class Test03_Discovery(unittest.TestCase):
                     '0.7':{
                         'mesos_dns':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
-                            'self_check.json':'53b8ddc27e357620f01ea75a7ab827cd90c77446'
+                            'self_check.json':'6239f6da032f241d4360bd1af299f28f10fe9d12'
                         },
                         'marathon_api':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
@@ -359,7 +359,7 @@ class Test03_Discovery(unittest.TestCase):
                     '0.8':{
                         'mesos_dns':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
-                            'self_check.json':'27c0ffd26da16ccaf63280946076e39265e0b3e8'
+                            'self_check.json':'cb16e09a861acfd47d458342f0d7259b4401b76d'
                         },
                         'marathon_api':{
                             'marathon_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f',
@@ -381,7 +381,7 @@ class Test03_Discovery(unittest.TestCase):
                         },
                         'marathon_api':{
                             'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
-                            'self_check.json':'53b8ddc27e357620f01ea75a7ab827cd90c77446'
+                            'self_check.json':'6239f6da032f241d4360bd1af299f28f10fe9d12'
                         },
                         'none':{
                             'marathon_check.json':'ef55fb10c20df700cb715f4836eadb2d0cfa9cc1',
@@ -390,15 +390,15 @@ class Test03_Discovery(unittest.TestCase):
                     },
                     '0.8':{
                         'mesos_dns':{
-                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
+                            'marathon_check.json':'c132c8708b8fcbf7598153fc7eeafe23fd83a504',
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         },
                         'marathon_api':{
-                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
-                            'self_check.json':'27c0ffd26da16ccaf63280946076e39265e0b3e8'
+                            'marathon_check.json':'c132c8708b8fcbf7598153fc7eeafe23fd83a504',
+                            'self_check.json':'cb16e09a861acfd47d458342f0d7259b4401b76d'
                         },
                         'none':{
-                            'marathon_check.json':'01c3a7ed5830c08d3469dca57cde4c9c1d90f34d',
+                            'marathon_check.json':'c132c8708b8fcbf7598153fc7eeafe23fd83a504',
                             'self_check.json':'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f'
                         }
                     }
@@ -438,10 +438,10 @@ class Test03_Discovery(unittest.TestCase):
         config = Config('/usr/share/surok/conf/surok_check.json')
         config['env'] = {'SUROK_DISCOVERY_GROUP': 'xxx.yyy'}
         discovery = Discovery()
-        for mesos_enabled in tests:
-            for marathon_enabled in tests[mesos_enabled]:
-                for version in tests[mesos_enabled][marathon_enabled]:
-                    for default_discovery in tests[mesos_enabled][marathon_enabled][version]:
+        for mesos_enabled in sorted(tests):
+            for marathon_enabled in sorted(tests[mesos_enabled]):
+                for version in sorted(tests[mesos_enabled][marathon_enabled]):
+                    for default_discovery in sorted(tests[mesos_enabled][marathon_enabled][version]):
                         config['default_discovery'] = default_discovery
                         config['mesos']['enabled'] = mesos_enabled == 'T'
                         config['marathon']['enabled'] = marathon_enabled == 'T'
