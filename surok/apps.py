@@ -61,22 +61,16 @@ class Apps:
                         f = open(conf.get('dest'), 'w')
                         f.write(conf.get('value'))
                         f.close()
-                    except OSError as err:
+                    except Exception as err:
                         self._logger.error(
-                            'Config file {0} open or write error. OS error : {1}'.format(
-                                conf.get('dest'), err))
-                        pass
-                    except err:
-                        self._logger.error(
-                            'Config file {0} open or write error. Error : {1}'.format(
-                                conf.get('dest'), err))
+                            'Config file %s open or write error. %s' % (conf.get('dest'), err))
                         pass
             if _restart and not self._error:
                 if self._config['marathon']['restart']:
                     self._restart_self_in_marathon()
                 else:
                     if app.get('reload_cmd'):
-                        self._logger.info('Restart "{0}" app:\n{1}'.format(
+                        self._logger.info('Restart "%s" app:\n%s' % (
                             app['reload_cmd'], os.popen(app['reload_cmd']).read()))
         self._store.clear()
 
@@ -87,10 +81,8 @@ class Apps:
             try:
                 template = jinja2.Template(temp)
                 data = template.render(my=my, mod=mod)
-            except jinja2.UndefinedError as err:
-                self._logger.error('Render Jinja2 error. ', err)
-            except:
-                self._logger.error('Render Jinja2 error. Unknown error')
+            except (jinja2.UndefinedError, Exception) as err:
+                self._logger.error('Render Jinja2 error. %s' % err)
             finally:
                 mod.dump_logs()
                 self._error = mod.get_error()
@@ -99,11 +91,10 @@ class Apps:
     def _restart_self_in_marathon(self):
         env = os.environ.get('MARATHON_APP_ID')
         if env:
-            r = requests.post('http://' + self._config['marathon']['host'] + '/v2/apps/' + env + '/restart',
+            r = requests.post('http://%s/v2/apps/%s/restart' % (self._config['marathon']['host'], env),
                               data={'force': self._config['marathon']['force']})
             if r.status_code != 200:
-                self._logger.error('Restart container {0} failed. {1}'.format(
-                    env, r.raise_for_status()))
+                self._logger.error('Restart container %s failed. %s' % (env, r.raise_for_status()))
         else:
             self._logger.error('Restart self container failed. Cannot find MARATHON_APP_ID.')
 
@@ -136,7 +127,7 @@ class LoadModules:
                 try:
                     m = imp.load_source('__surok.module__', module)
                 except:
-                    self._logger.error('Load module {} failed.'.format(module))
+                    self._logger.error('Load module %s failed.' % module)
                 finally:
                     for key in [x for x in dir(m) if type(
                             getattr(m, x)).__name__ == 'function' and not x.startswith('_')]:
@@ -182,10 +173,9 @@ class _ExecModule:
             self.addlogs('kwargs: ', kwargs)
             try:
                 result = self.function(self.modules, *args, **kwargs)
-            except:
-                self.modules._error()
-            if self.get_error():
-                self.addlogs('Failed execute: ', self.name)
-            else:
                 self.addlogs('Return: ', result)
+            except Exception as err:
+                self.addlogs('Failed execute: ', self.name)
+                self.addlogs('Error: %s' % err)
+                self.modules._error()
             return result

@@ -9,7 +9,7 @@ from .discovery import Discovery
 __all__ = ['Store']
 
 
-class Store(dict):
+class Store:
 
     """ Public Store object
     ==================================================
@@ -91,19 +91,17 @@ class Store(dict):
                 try:
                     if os.path.isfile(temp.get('dest')):
                         os.remove(temp.get('dest'))
-                except OSError as err:
+                except Exception as err:
                     self._logger.warning(
-                        "Delete file {0} failed:\n{1}".format(
-                            temp.get('dest'), err))
+                        "Delete file %s failed:\n%s" % (temp.get('dest'), err))
                     pass
             elif temp.get('env'):
                 try:
                     if os.environ.get(temp.get('env')):
                         del os.environ[temp.get('env')]
-                except:
+                except Exception as err:
                     self._logger.warning(
-                        'Delete environment "{0}" failed.'.format(
-                            temp.get('env')))
+                        'Delete environment "%s" failed.' % (temp.get('env'), err))
                     pass
             self.delete(temp)
         self._update_store = {}
@@ -116,13 +114,13 @@ class Store(dict):
             conf = unnormconf.copy()
         else:
             conf = {'hashid': unnormconf}
-        conf.setdefault('store', self._config['default_store'])
+        conf.setdefault('store', self._config['defaults']['store'])
         if 'dest' in conf:
             conf['hashid'] = hashsha1(conf['dest'])
         elif 'env' in conf:
-            conf['hashid'] = hashsha1('env:' + conf['env'])
+            conf['hashid'] = hashsha1('env:%s' % conf['env'])
         elif 'localid' in conf:
-            conf['hashid'] = hashsha1('data:' + conf['localid'])
+            conf['hashid'] = hashsha1('data:%s' % conf['localid'])
 
         if 'data' in conf:
             conf['hash'] = hashsha1(json.dumps(conf['data'], sort_keys=True))
@@ -131,13 +129,13 @@ class Store(dict):
 
         if not self._stores[conf['store']].enabled():
             self._logger.warning(
-                'Store "{0}" not enabled. Store type change to "memory" for hashid "{1}".'.format(
+                'Store "%s" not enabled. Store type change to "memory" for hashid "%s".' % (
                     conf['store'], conf['hashid']))
             conf['store'] = 'memory'
         return conf
 
 
-class _StoreTemplate(dict):
+class _StoreTemplate:
 
     def __init__(self, *args):
         self._config = Config()
@@ -192,40 +190,24 @@ class StoreFiles(_StoreTemplate):
     def get(self, key, default=None):
         temp = default
         try:
-            filename = os.path.join(self._config['files']['path'], key + '.surok')
+            filename = os.path.join(self._config['files']['path'], '%s.surok' % key)
             if os.path.isfile(filename):
                 f = open(filename, 'r')
                 json_temp = f.read()
                 f.close()
                 temp = json.loads(json_temp)
-        except OSError as err:
-            self._logger.error(
-                'Get from "files" store failed. OS error: {}'.format(err))
-            pass
-        except ValueError as err:
-            self._logger.error(
-                'Get from "files" store failed. JSON format error: {}'.format(err))
-            pass
-        except:
-            self._logger.error('Get from "files" store failed. Unknown error.')
+        except Exception as err:
+            self._logger.error('Get from "files" store failed. %s' % err)
             pass
         return temp
 
     def set(self, key, value):
         try:
-            f = open(os.path.join(self._config['files']['path'], key + '.surok'), 'w')
+            f = open(os.path.join(self._config['files']['path'], '%s.surok' % key), 'w')
             f.write(json.dumps(value, sort_keys=True))
             f.close()
-        except OSError as err:
-            self._logger.error(
-                'Set from "files" store failed. OS error: {0}'.format(err))
-            pass
-        except ValueError as err:
-            self._logger.error(
-                'Set from "files" store failed. JSON format error: {0}'.format(err))
-            pass
-        except:
-            self._logger.error('Set from "files" store failed. Unknown error.')
+        except Exception as err:
+            self._logger.error('Set from "files" store failed. %s' % err)
             pass
 
     def keys(self):
@@ -235,10 +217,9 @@ class StoreFiles(_StoreTemplate):
 
     def delete(self, key):
         try:
-            os.remove(os.path.join(self._config['files']['path'], key + '.surok'))
-        except OSError as err:
-            self._logger.error(
-                'Delete from "files" store failed. OS error: {0}'.format(err))
+            os.remove(os.path.join(self._config['files']['path'], '%s.surok' % key))
+        except Exception as err:
+            self._logger.error('Delete from "files" store failed. %s' % err)
             pass
 
     def check(self):
@@ -268,16 +249,16 @@ class StoreMemcached(_StoreTemplate):
                 try:
                     self._mc = self._mod_memcache.Client(self._hosts)
                     self._enabled = True
-                except:
-                    self._logger.error('Create memcached object failed')
+                except Exception as err:
+                    self._logger.error('Create memcached object failed. %s' % err)
                     self._disconnect()
             else:
                 try:
                     self._mc.disconnect_all()
                     self._mc.set_servers(self._hosts)
                     self._enabled = True
-                except:
-                    self._logger.error('Change memcached list of servers failed')
+                except Exception as err:
+                    self._logger.error('Change memcached list of servers failed. %s' % err)
                     self._disconnect()
         else:
             self._disconnect()
@@ -330,29 +311,20 @@ class StoreMemcached(_StoreTemplate):
         try:
             if key in self.keys():
                 temp = json.loads(self._mc.get(key))
-        except ValueError as err:
-            self._logger.error(
-                'Get from "memcached" store failed. JSON format error: {0}'.format(err))
-            pass
-        except:
-            self._logger.error(
-                'Get from "memcached" store failed. Unknown error. Made reconnect\nKey:', key)
-            self.check()
+        except Exception as err:
+            self._logger.error('Get from "memcached" store failed. %s' % err)
+            if type(err) not in [ValueError]:
+                self.check()
             pass
         return temp
 
     def set(self, key, value):
         try:
             self._mc.set(key, json.dumps(value, sort_keys=True))
-        except ValueError as err:
-            self._logger.error(
-                'Set from "memcached" store failed. JSON format error: {0}'.format(err))
-            pass
-        except:
-            self._logger.error(
-                ('Set from "memcached" store failed. Unknown error. Made reconnect\n'
-                    'Key:'), key, '\nValue:\n', value)
-            self.check()
+        except Exception as err:
+            self._logger.error('Set from "memcached" store failed. %s' % err)
+            if type(err) not in [ValueError]:
+                self.check()
             pass
 
     def keys(self):
@@ -369,8 +341,7 @@ class StoreMemcached(_StoreTemplate):
     def delete(self, key):
         try:
             self._mc.delete(key)
-        except:
-            self._logger.error(
-                'Delete from "memcached" store failed. Unknown error. Made reconnect')
+        except Exception as err:
+            self._logger.error('Delete from "memcached" store failed. %s' % err)
             self.check()
             pass

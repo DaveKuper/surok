@@ -43,7 +43,7 @@ class Logger:
             self._loglevel = level
             return True
         else:
-            self.warning('Log level "', level, '" not valid')
+            self.warning('Log level "%s" not valid' % level)
             return False
 
     def get_level(self):
@@ -56,7 +56,7 @@ class Logger:
                 r.append(m)
             else:
                 r.append(json.dumps(m, sort_keys=True, indent=2))
-        return "[ {0} ] {1}: {2}\n".format(
+        return '[ %s ] %s: %s\n' % (
             str(time.time()), self._msg_level[level], ''.join(r))
 
     def debug(self, *message):

@@ -14,8 +14,10 @@
         "path": "/var/tmp",
         "enabled": false
     },
-    "default_discovery": "mesos_dns",
-    "default_store": "memory",
+    "defaults":{
+        "discovery": "mesos_dns",
+        "store": "memory"
+    },
     "confd": "/usr/share/surok/conf.d",
     "wait_time": 20,
     "loglevel": "info",

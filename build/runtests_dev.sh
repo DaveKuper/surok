@@ -9,9 +9,10 @@ function run_tests() {
         docker run -d --name surok-memcache memcached
         docker run --rm \
                      --link surok-memcache:memcache \
-                     -v $(pwd)/tests.py:/opt/surok/tests.py \
-                     -v $(pwd)/../surok:/opt/surok/surok \
-                     -v $(pwd)/tests_entrypoint.sh:/tests_entrypoint.sh \
+                     -v $(pwd)/tests.py:/opt/surok/tests.py:ro \
+                     -v $(pwd)/../surok:/opt/surok/surok:ro \
+                     -v $(pwd)/..:/usr/share/surok/:ro \
+                     -v $(pwd)/tests_entrypoint.sh:/tests_entrypoint.sh:ro \
                      --entrypoint /tests_entrypoint.sh \
                      surok_base:latest
 }

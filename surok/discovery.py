@@ -30,7 +30,7 @@ class DiscoveryTemplate:
             for a_rdata in resolver.query(fqdn, 'A'):
                 servers.append(a_rdata.address)
         except dns.exception.DNSException as err:
-            self._logger.error('Could not resolve {0}. Error: {1}'.format(fqdn, err))
+            self._logger.error('Could not resolve %s. Error: %s' % (fqdn, err))
         return servers
 
     # Do DNS queries
@@ -47,7 +47,7 @@ class DiscoveryTemplate:
                 info = str(rdata).split()
                 servers.append({'name': info[3][:-1], 'port': info[2]})
         except dns.exception.DNSException as err:
-            self._logger.error('Could not resolve {0}. Error: {1}'.format(fqdn, err))
+            self._logger.error('Could not resolve %s. Error: %s' % (fqdn, err))
         return servers
 
 
@@ -75,14 +75,14 @@ class Discovery:
 
     def resolve(self, app):
         if app['services']:
-            discovery = app.get('discovery', self._config['default_discovery'])
+            discovery = app.get('discovery', self._config['defaults']['discovery'])
             if discovery in self.keys():
                 if self._discoveries[discovery].enabled():
                     return self.compatible(self._discoveries[discovery].resolve(app))
                 else:
-                    self._logger.error('Discovery "{}" is disabled'.format(discovery))
+                    self._logger.error('Discovery "%s" is disabled' % discovery)
             else:
-                self._logger.warning('Discovery "{}" is not present'.format(discovery))
+                self._logger.warning('Discovery "%s" isn\'t present' % discovery)
         return {}
 
     def update_data(self):
@@ -122,12 +122,7 @@ class DiscoveryMesos(DiscoveryTemplate):
         hosts = {}
         domain = self._config['mesos']['domain']
         for service in app['services']:
-            group = service.get('group', app['group'])
-            if group is None:
-                self._logger.error(
-                    'Group for service "{}" of config "{}" not found'.format(
-                        service['name'], app.get('conf_name')))
-                continue
+            group = '.'.join(service['group'].split('/')[-2:0:-1])
             name = service['name']
             hosts[name] = {}
             serv = hosts[name]
@@ -136,8 +131,7 @@ class DiscoveryMesos(DiscoveryTemplate):
                 if len(ports):
                     for port_name in ports:
                         for hostname, port in [(x['name'], x['port']) for x in self.do_query_srv(
-                                '_{0}._{1}.{2}._{3}.{4}'.format(
-                                    port_name, name, group, prot, domain))]:
+                                '_%s._%s.%s._%s.%s' % (port_name, name, group, prot, domain))]:
                             if hostname not in serv:
                                 serv[hostname] = {'name': hostname,
                                                   'ip': self.do_query_a(hostname)}
@@ -145,7 +139,7 @@ class DiscoveryMesos(DiscoveryTemplate):
                             serv[hostname][prot][port_name] = port
                 else:
                     for hostname, port in [(x['name'], x['port']) for x in self.do_query_srv(
-                            '_{0}.{1}._{2}.{3}'.format(name, group, prot, domain))]:
+                            '_%s.%s._%s.%s' % (name, group, prot, domain))]:
                         if hostname not in serv:
                             serv[hostname] = {'name': hostname,
                                               'ip': self.do_query_a(hostname)}
@@ -164,20 +158,19 @@ class DiscoveryMarathon(DiscoveryTemplate):
         hostname = self._config[self._config_section].get('host')
         try:
             ports = {}
-            for app in requests.get(hostname + '/v2/apps').json()['apps']:
+            for app in requests.get('%s/v2/apps' % hostname).json()['apps']:
                 ports[app['id']] = {}
                 if app.get('container') is not None and app['container'].get('type') == 'DOCKER':
                     ports[app['id']] = app['container']['docker'].get('portMappings', [])
             self._ports = ports
         except:
-            self._logger.warning(
-                'Apps ({}/v2/apps) request from Marathon API is failed'.format(hostname))
+            self._logger.warning('Apps (%s/v2/apps) request from Marathon API is failed' % hostname)
             pass
         try:
-            self._tasks = requests.get(hostname + '/v2/tasks').json()['tasks']
+            self._tasks = requests.get('%s/v2/tasks' % hostname).json()['tasks']
         except:
             self._logger.warning(
-                'Tasks ({}/v2/tasks) request from Marathon API is failed'.format(hostname))
+                'Tasks (%s/v2/tasks) request from Marathon API is failed' % hostname)
             pass
 
     def _test_mask(self, mask, value):
@@ -186,14 +179,7 @@ class DiscoveryMarathon(DiscoveryTemplate):
     def resolve(self, app):
         hosts = {}
         for service in app['services']:
-            group = service.get('group', app.get('group'))
-            if group is None:
-                self._logger.error(
-                    'Group for service "{}" of config "{}" not found'.format(
-                        service['name'], app['conf_name']))
-                continue
-            # Convert xxx.yyy.zzz to /zzz/yyy/xxx/ format
-            group = '/' + '/'.join(group.split('.')[::-1]) + '/'
+            group = service['group']
             service_mask = group + service['name']
             for task in self._tasks:
                 if self._test_mask(service_mask, task['appId']):

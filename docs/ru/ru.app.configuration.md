@@ -1,6 +1,6 @@
 # Конфигурация приложения
 
-/etc/surok/conf.d/app.json
+**/etc/surok/conf.d/app.json**
 ```
 {
     "services": [

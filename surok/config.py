@@ -6,7 +6,7 @@ from .logger import Logger
 __all__ = ['Config', 'AppConfig']
 
 
-class _ConfigTemplate(dict):
+class _ConfigTemplate:
 
     """ Test values
     ==================================================
@@ -16,24 +16,28 @@ class _ConfigTemplate(dict):
     type_par - additional parameters for test
     """
     _conf = None
+    _environ = None
 
     def _init_conf(self, params):
         conf = {}
-        for k in params.keys():
-            if params[k].get('params'):
-                conf[k] = self._init_conf(params[k]['params'])
+        for key in params.keys():
+            if params[key].get('params'):
+                conf[key] = self._init_conf(params[key]['params'])
             else:
-                value = params[k].get('value')
+                value = params[key].get('value')
+                if params[key].get('env'):
+                    value = self._set_conf_params({},{key: value}, params).get(key)
                 if value is not None:
-                    if type(value).__name__ == 'dict':
-                        conf[k] = value.copy()
+                    if type(value) in [dict, list]:
+                        conf[key] = value.copy()
                     else:
-                        conf[k] = value
+                        conf[key] = value
         return conf
 
     def __init__(self, *conf_data):
         self._logger = Logger()
         if self._conf is None:
+            self._environ = os.environ
             self._conf = self._init_conf(self._params)
         for c in conf_data:
             self.set_config(c)
@@ -48,18 +52,24 @@ class _ConfigTemplate(dict):
             oldvalue = conf.get(key)
             testvalue = testconf.get(key)
             if param is None:
-                self._logger.error('Parameter "', key, '" value "', testvalue,
-                                   '" type is "', type(testvalue).__name__, '" not found')
+                self._logger.error('Parameter "%s" value "' % key, testvalue,
+                    '" type is "%s" not found' % type(testvalue).__name__)
             else:
                 type_param = param['type']
+                if param.get('env'):
+                    testvalue = self._environ.get(param['env'], testvalue)
+                    conv_type = [y for x, y in [('str', str), ('int', int), ('bool', bool)] if x in type_param]
+                    if testvalue is not None and len(conv_type) > 0:
+                        testvalue = conv_type[0](testvalue)
+                    else:
+                        continue
                 resvalue = []
                 reskeys = []
                 if 'anykeys' in type_param:
                     if type(testvalue).__name__ == 'dict':
                         testvalue = testvalue.items()
                     else:
-                        self._logger.warning(
-                            'Parameter "{}" must be "dict" type'.format(key))
+                        self._logger.warning('Parameter "%s" must be "dict" type' % key)
                         continue
                 elif type(testvalue).__name__ != 'list':
                     testvalue = [testvalue]
@@ -76,6 +86,8 @@ class _ConfigTemplate(dict):
                                     resvalue.append(res)
                                     reskeys.append(key_testitem)
                         else:
+                            if 'group' in type_param:
+                                testitem = self._group_normalize(testitem)
                             resvalue.append(testitem)
                             reskeys.append(key_testitem)
                 if 'anykeys' in type_param:
@@ -84,9 +96,8 @@ class _ConfigTemplate(dict):
                     resvalue = list([None] + resvalue).pop()
                 if resvalue is not None and 'do' in type_param:
                     if not self._do_type_set(key, resvalue, param):
-                        self._logger.warning(
-                            'Parameter "', key, '" current "', resvalue, '" type is "', type(
-                                resvalue).__name__, '" testing failed')
+                        self._logger.warning('Parameter "%s" current "' % key, resvalue,
+                            '" type is "%s" testing failed' % type(resvalue).__name__)
                         resvalue = None
                 if resvalue is not None:
                     conf[key] = resvalue
@@ -97,28 +108,34 @@ class _ConfigTemplate(dict):
         type_value = [x for x in type_param if x in ['str', 'int', 'bool', 'dict']]
         if type_value:
             if type(value).__name__ not in type_value:
-                self._logger.error(
-                    'Parameter "{0}" must be {1} types, current "'.format(
-                        key, type_value), value, '" (', type(value).__name__, ')')
+                self._logger.error('Parameter "%s" must be %s types, current "' % (
+                    key, type_value), value, '" (%s)' % type(value).__name__)
                 return False
             if 'value' in type_param:
                 if value not in param.get('values', []):
-                    self._logger.error(
-                        'Value "', value, '" of key "', key, '" unknown')
+                    self._logger.error('Value "', value, '" of key "%s" unknown' % key)
                     return False
             if 'dir' in type_param:
                 if not os.path.isdir(value):
-                    self._logger.error('Path "{}" not present'.format(value))
+                    self._logger.error('Path "%s" not present' % value)
                     return False
             elif 'file' in type_param:
                 if not os.path.isfile(value):
-                    self._logger.error('File "{}" not present'.format(value))
+                    self._logger.error('File "%s" not present' % value)
                     return False
             return True
         else:
-            self._logger.error(
-                'Type for testing "{}" unknown'.format(type_value))
+            self._logger.error('Type for testing "%s" unknown' % type_value)
             return False
+
+    def _group_normalize(self, group):
+        prefix = '/'
+        if group.endswith('/'):
+            return group
+        if group.endswith('*'):
+            prefix = ''
+            group = group[0:-1]
+        return '%s%s/' % (prefix, '/'.join(group.split('.')[::-1]))
 
     def set_config(self, conf_data):
         conf = {}
@@ -129,14 +146,8 @@ class _ConfigTemplate(dict):
                 json_data = f.read()
                 f.close()
                 conf = json.loads(json_data)
-            except OSError as err:
-                self._logger.error("OS error: {0}".format(err))
-                pass
-            except ValueError as err:
-                self._logger.error('JSON format error: {0}'.format(err))
-                pass
-            except:
-                self._logger.error('Load config file failed')
+            except Exception as err:
+                self._logger.error('Load config file failed. %s' % err)
                 pass
         elif type(conf).__name__ == 'dict':
             conf = conf_data
@@ -147,6 +158,9 @@ class _ConfigTemplate(dict):
 
     def keys(self):
         return self._conf.keys()
+
+    def setdefault(self, key, value):
+        self._conf.setdefault(key, value)
 
     def dump(self):
         return json.dumps(self._conf, sort_keys=True, indent=2)
@@ -169,6 +183,9 @@ class _ConfigTemplate(dict):
 
     def __getitem__(self, key):
         return self.get(key)
+
+    def __delitem__(self, key):
+        del self._conf[key]
 
     def __contains__(self, item):
         return bool(item in self._conf)
@@ -223,7 +240,8 @@ class Config(_ConfigTemplate):
             'params': {
                 'domain': {
                     'value': 'marathon.mesos',
-                    'type': ['str']
+                    'type': ['str'],
+                    'env': 'SUROK_MESOS_DOMAIN'
                 },
                 'enabled': {
                     'value': False,
@@ -261,7 +279,7 @@ class Config(_ConfigTemplate):
                             'type': ['str']
                         },
                         'group': {
-                            'type': ['str']
+                            'type': ['str', 'group']
                         }
                     },
                     'type': ['dict']
@@ -271,6 +289,25 @@ class Config(_ConfigTemplate):
                 },
                 'hosts': {
                     'type': ['list', 'str']
+                }
+            },
+            'type': ['dict']
+        },
+        'defaults': {
+            'params': {
+                'discovery': {
+                    'value': 'none',
+                    'type': ['str', 'value'],
+                    'values': ['none', 'mesos_dns', 'marathon_api']
+                },
+                'store': {
+                    'value': 'memory',
+                    'type': ['str', 'value'],
+                    'values': ['memory', 'files', 'memcached']
+                },
+                'group': {
+                    'type': ['str', 'group'],
+                    'env': 'SUROK_DISCOVERY_GROUP'
                 }
             },
             'type': ['dict']
@@ -295,20 +332,11 @@ class Config(_ConfigTemplate):
         'lock_dir': {
             'type': ['str', 'dir']
         },
-        'default_discovery': {
-            'value': 'none',
-            'type': ['str', 'value'],
-            'values': ['none', 'mesos_dns', 'marathon_api']
-        },
         'loglevel': {
             'value': 'info',
             'type': ['str', 'do'],
-            'do': 'set_loglevel'
-        },
-        'default_store': {
-            'value': 'memory',
-            'type': ['str', 'value'],
-            'values': ['memory', 'files', 'memcached']
+            'do': 'set_loglevel',
+            'env': 'SUROK_LOGLEVEL'
         },
         'domain': {
             'type': ['str']
@@ -329,12 +357,18 @@ class Config(_ConfigTemplate):
             domain = self.get('domain')
             if domain is not None:
                 self['mesos'] = {'domain': domain, 'enabled': True}
-                self['default_discovery'] = 'mesos_dns'
+                self['defaults']['discovery'] = 'mesos_dns'
             path = self.get('lock_dir')
             if path is not None:
                 self['files'] = {'path': path, 'enabled': True}
             self['marathon']['restart'] = self['marathon']['enabled']
             self['marathon']['enabled'] = True
+        if not self['defaults'].get('group','/').startswith('/'):
+            del self['defaults']['group']
+        if 'group' not in self['defaults']:
+            marathon_id = self._environ.get('MARATHON_APP_ID')
+            if marathon_id is not None:
+                self['defaults']['group'] = '%s/' % '/'.join(marathon_id.split('/')[:-1])
 
     def _do_type_set(self, key, value, param):
         if param.get('do') == 'set_loglevel':
@@ -383,7 +417,7 @@ class AppConfig(_ConfigTemplate):
                     'type': ['str']
                 },
                 'group': {
-                    'type': ['str']
+                    'type': ['str', 'group']
                 }
             },
             'type': ['list', 'dict']
@@ -408,7 +442,7 @@ class AppConfig(_ConfigTemplate):
             'values': ['memory', 'files', 'memcached']
         },
         'group': {
-            'type': ['str']
+            'type': ['str', 'group']
         },
         'template': {
             'type': ['str']
@@ -425,24 +459,33 @@ class AppConfig(_ConfigTemplate):
 
     def set_config(self, conf_data):
         super().set_config(conf_data)
-        self._conf.setdefault('discovery', self._config['default_discovery'])
-        self._conf.setdefault('store', self._config['default_store'])
-        if 'group' not in self._conf:
-            self._conf['group'] = self._get_default_group()
+        if not self.get('group','/').startswith('/'):
+            if self._config['defaults'].get('group'):
+                self['group'] = self._config['defaults']['group'] + self['group']
+            else:
+                del self['group']
+        for key, item in self._config['defaults'].items():
+            self.setdefault(key, item)
         if 'dest' in self._conf and 'template' in self._conf:
             self._conf['files'].update(
                 {self._conf['dest']:
-                    '{{ mod.template(mod.from_file("' + self._conf['template'] + '")) }}'})
-        for service in self._conf.get('services', {}):
-            if service.get('ports'):
+                    '{{ mod.template(mod.from_file("%s")) }}' % self._conf['template']})
+        services = self.get('services', [])
+        i = 0
+        while i < len(services):
+            service = services[i]
+            if not service.get('group','/').startswith('/'):
+                if self.get('group'):
+                    service['group'] = self['group'] + service['group']
+                else:
+                    self._logger.error('Some services haven\'t group.\n%s' % self)
+                    del services[i]
+                    continue
+            if self.get('group'):
+                services[i].setdefault('group', self['group'])
+            if 'ports' in service or self._config['version'] == '0.7':
                 service.setdefault('tcp', [])
-                service['tcp'].extend(service.get('ports'))
+                service['tcp'].extend(service.get('ports',[]))
+            i += 1
         if type(conf_data).__name__ == 'str' and 'conf_name' not in self._conf:
             self._conf['conf_name'] = os.path.basename(conf_data)
-
-    def _get_default_group(self):
-        env = self._config.get('env', dict(os.environ))
-        if env.get('SUROK_DISCOVERY_GROUP'):
-            return env['SUROK_DISCOVERY_GROUP']
-        elif env.get('MARATHON_APP_ID'):
-            return ".".join(env['MARATHON_APP_ID'].split('/')[-2:0:-1])
